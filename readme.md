@@ -130,6 +130,13 @@ dcave14 - [GitHub Profile](https://github.com/dcave14)
 
 ## Changelog
 
+### 1.3.1
+- Firefox version (Firefox 140+), built from the same source with `node build.js`
+- Hide Subscribed on Steam's new Workshop layout now works in Firefox (the subscription
+  request carries your Steam login there too)
+- Added the MIT `LICENSE` file
+- Same features as 1.3.0; re-released so the store packages can be replaced
+
 ### 1.3.0
 - Support for Steam's new Workshop layout (`steamcommunity.com/app/*/workshop/*` and the
   new browse pages): card detection, star ratings and subscribed state via Steam's
@@ -142,7 +149,6 @@ dcave14 - [GitHub Profile](https://github.com/dcave14)
 - Star Rating dropdown restyled to match each page
 - Buttons appear as soon as Steam's page is ready (about 1.4s instead of 3s+)
 - Faster on large collections: no extra page-load delay, fewer layout passes, quicker clicks
-- Firefox version (Firefox 140+), built from the same source with `node build.js`
 - Added a performance test (`perf/`)
 - Updated the privacy policy (now hosted on GitHub Pages)
 
