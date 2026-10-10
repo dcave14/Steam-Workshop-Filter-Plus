@@ -378,15 +378,21 @@
     // function returns, so the result always describes the unfiltered grid and
     // filtering can never change the button geometry. Only genuinely invisible
     // cards (still zero after the pass) are skipped. Returns null when no card
-    // is measurable.
+    // is measurable. Cards hidden by saved author filters (saved-filters.js,
+    // wshs-filtered) get the same treatment.
+    var FILTER_CLASSES = ['hidden-item', 'wshs-filtered'];
+
     function getCardGeometry() {
         var cards = enumerateCards();
         var unhidden = [];
         for (var u = 0; u < cards.length; u++) {
             var hiddenRoot = cards[u].root;
-            if (hiddenRoot.classList && hiddenRoot.classList.contains('hidden-item')) {
-                hiddenRoot.classList.remove('hidden-item');
-                unhidden.push(hiddenRoot);
+            if (!hiddenRoot.classList) continue;
+            for (var c = 0; c < FILTER_CLASSES.length; c++) {
+                if (hiddenRoot.classList.contains(FILTER_CLASSES[c])) {
+                    hiddenRoot.classList.remove(FILTER_CLASSES[c]);
+                    unhidden.push({ root: hiddenRoot, cls: FILTER_CLASSES[c] });
+                }
             }
         }
         try {
@@ -429,7 +435,7 @@
             return { width: width, gap: gap, columns: columns.length, card: rects[0].root };
         } finally {
             for (var r = 0; r < unhidden.length; r++) {
-                unhidden[r].classList.add('hidden-item');
+                unhidden[r].root.classList.add(unhidden[r].cls);
             }
         }
     }
@@ -644,6 +650,7 @@
         getSortButton: getSortButton,
         getSortOptionLabels: getSortOptionLabels,
         getCardGeometry: getCardGeometry,
+        enumerateCards: enumerateCards,
         applyFilters: applyFilters,
         onStatusUpdate: onStatusUpdate
     };

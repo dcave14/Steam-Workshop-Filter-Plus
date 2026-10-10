@@ -17,7 +17,8 @@ const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const EXT_SRC = path.resolve(__dirname, '..', '..');
 const OUT = path.resolve(__dirname, '..', 'out', 'store-assets', 'raw');
 const EXT_FILES = ['manifest.json', 'steam-dom.js', 'content.js', 'collection-row-align.js',
-    'hydration-signal.js', 'sort-popover-fit.js', 'styles.css', 'Steam-Workshop-Filter-Plus-Icon.png'];
+    'hydration-signal.js', 'sort-popover-fit.js', 'styles.css', 'Steam-Workshop-Filter-Plus-Icon.png',
+    'saved-filters.js', 'saved-filters.css', 'search-terms-hook.js'];
 
 const BROWSE_URL = 'https://steamcommunity.com/workshop/browse/?appid=294100&browsesort=trend&section=readytouseitems';
 // An English RimWorld collection, so the store shots read clearly.

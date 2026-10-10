@@ -1,0 +1,123 @@
+/* saved-filters.css
+   Styles for saved-filters.js: the sidebar section (built from clones of
+   Steam's Categories section, so most of its look is Steam's own classes)
+   and the [+][-] picker beside card authors and title selections. */
+
+/* Cards hidden by a saved author filter. */
+.wshs-filtered {
+    display: none !important;
+}
+
+/* Same 5px row pitch as Steam's Categories list. */
+.wshs-sf-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.wshs-sf-list:empty {
+    display: none;
+}
+
+.wshs-saved-filters .wshs-sf-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: default;
+}
+
+.wshs-sf-delete {
+    flex: none;
+    padding: 0 4px;
+    color: #5c6672;
+    font-size: 15px;
+    line-height: 20px;
+    cursor: pointer;
+}
+
+.wshs-sf-delete:hover {
+    color: #fff;
+}
+
+.wshs-sf-add {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+/* Background is copied from Steam's search box at runtime; this is the
+   fallback. */
+.wshs-sf-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 7px 9px;
+    border: none;
+    border-radius: 2px;
+    outline: none;
+    background: #313843;
+    color: #fff;
+    font-family: inherit;
+    font-size: 13px;
+}
+
+.wshs-sf-input::placeholder {
+    color: #8a919a;
+    font-style: italic;
+}
+
+.wshs-sf-save {
+    flex: none;
+}
+
+/* Card picker: floats in <body> beside the author name or above a title
+   selection, so it never mutates React's card tree or gets clipped by the
+   title's ellipsis. */
+.wshs-picker {
+    position: absolute;
+    z-index: 6000;
+    display: none;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font-family, "Motiva Sans", Arial, Helvetica, sans-serif);
+}
+
+/* Inactive look of Steam's +/- buttons, and its hover. */
+.wshs-sq {
+    display: inline-flex;
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    --button-fill: #fff3;
+    --button-stroke: transparent;
+    --button-symbol: #fff;
+}
+
+.wshs-sq:hover {
+    --button-fill: #3b3d40;
+}
+
+.wshs-sq svg {
+    width: 14px;
+    height: 14px;
+}
+
+.wshs-picker-hint {
+    margin-left: 4px;
+    padding: 2px 6px;
+    background: rgba(14, 18, 24, 0.96);
+    box-shadow: 1px 1px 8px rgba(0, 0, 0, 0.6);
+    color: #acb2b8;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+/* Title links: a drag selects text (for the keyword picker) instead of
+   dragging the link. Firefox gets draggable="false" from saved-filters.js. */
+#CommunityTemplate a[href*="sharedfiles/filedetails/?id="]:not(:has(img)) {
+    -webkit-user-drag: none;
+    user-select: text;
+}

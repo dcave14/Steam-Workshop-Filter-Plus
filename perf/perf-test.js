@@ -32,7 +32,8 @@ const BROWSE_URL = 'https://steamcommunity.com/workshop/browse/?appid=294100&bro
 const COLLECTION_URL = 'https://steamcommunity.com/sharedfiles/filedetails/?id=3808371772';
 
 const EXT_FILES = ['manifest.json', 'steam-dom.js', 'content.js', 'collection-row-align.js',
-    'hydration-signal.js', 'sort-popover-fit.js', 'styles.css', 'Steam-Workshop-Filter-Plus-Icon.png'];
+    'hydration-signal.js', 'sort-popover-fit.js', 'styles.css', 'Steam-Workshop-Filter-Plus-Icon.png',
+    'saved-filters.js', 'saved-filters.css', 'search-terms-hook.js'];
 
 function copyExtension(variant) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wshs-perf-'));

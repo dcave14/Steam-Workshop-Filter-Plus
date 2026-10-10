@@ -1,0 +1,89 @@
+// search-terms-hook.js
+// Runs in the page's MAIN world (see manifest.json) so it can wrap the page's
+// own window.fetch, which the isolated content script world cannot replace.
+//
+// Single responsibility: append the saved keyword filters (saved-filters.js)
+// to the search text of Steam's browse requests, so Steam's server applies
+// them to title, description and tags while the address bar and search box
+// keep showing only what the user typed.
+//
+// Steam's new browse page loads results with two request shapes:
+//   - POST "routeAction" (x-valve-request-type header): search, filters and
+//     paging. The server reads the JSON body's search_text, not the URL.
+//   - GET "routeData": history navigation. The server reads the URL's
+//     searchtext parameter.
+// Both are rewritten. The terms come from the data-wshs-terms attribute on
+// <html>, which saved-filters.js keeps current; attributes are shared across
+// worlds, so no messaging is needed. When a rewritten routeAction answers,
+// data-wshs-fetched on <html> is bumped so saved-filters.js (and the tests)
+// can tell the filtered results have arrived.
+
+(function () {
+    'use strict';
+
+    var TERMS_ATTR = 'data-wshs-terms';
+    var FETCHED_ATTR = 'data-wshs-fetched';
+    var originalFetch = window.fetch;
+    if (typeof originalFetch !== 'function') return;
+
+    function getTerms() {
+        return (document.documentElement.getAttribute(TERMS_ATTR) || '').trim();
+    }
+
+    function withTerms(text, terms) {
+        return ((text || '').trim() + ' ' + terms).trim();
+    }
+
+    function requestType(input, init) {
+        var headers = (init && init.headers) || (input instanceof Request ? input.headers : null);
+        if (!headers) return null;
+        try {
+            return new Headers(headers).get('x-valve-request-type');
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function rewrite(input, init) {
+        var terms = getTerms();
+        if (!terms) return null;
+        var type = requestType(input, init);
+        if (type !== 'routeAction' && type !== 'routeData') return null;
+        var url = new URL(input instanceof Request ? input.url : String(input), window.location.href);
+        if (!/\/workshop\/browse\/?$/.test(url.pathname)) return null;
+
+        url.searchParams.set('searchtext', withTerms(url.searchParams.get('searchtext'), terms));
+        var nextInit = init;
+        if (init && typeof init.body === 'string' && init.body.indexOf('"search_text"') !== -1) {
+            var body = JSON.parse(init.body);
+            var args = Array.isArray(body) ? body : [body];
+            for (var i = 0; i < args.length; i++) {
+                if (args[i] && typeof args[i].search_text === 'string') {
+                    args[i].search_text = withTerms(args[i].search_text, terms);
+                }
+            }
+            nextInit = Object.assign({}, init, { body: JSON.stringify(body) });
+        }
+        var nextInput = input instanceof Request ? new Request(url.href, input) : url.href;
+        return { input: nextInput, init: nextInit, isAction: type === 'routeAction' };
+    }
+
+    window.fetch = function (input, init) {
+        var next = null;
+        try {
+            next = rewrite(input, init);
+        } catch (error) {
+            // A request this hook does not understand goes out unchanged.
+            next = null;
+        }
+        if (!next) return originalFetch.apply(this, arguments);
+        var pending = originalFetch.call(this, next.input, next.init);
+        if (next.isAction) {
+            pending.then(function () {
+                var root = document.documentElement;
+                root.setAttribute(FETCHED_ATTR, String(Number(root.getAttribute(FETCHED_ATTR) || 0) + 1));
+            }, function () {});
+        }
+        return pending;
+    };
+})();

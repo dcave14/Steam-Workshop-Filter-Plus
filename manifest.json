@@ -14,8 +14,8 @@
                 "*://*.steamcommunity.com/sharedfiles/filedetails/*",
                 "*://*.steamcommunity.com/app/*/workshop/*"
             ],
-            "js": ["steam-dom.js", "content.js", "collection-row-align.js", "sort-popover-fit.js"],
-            "css": ["styles.css"],
+            "js": ["steam-dom.js", "content.js", "collection-row-align.js", "sort-popover-fit.js", "saved-filters.js"],
+            "css": ["styles.css", "saved-filters.css"],
             "run_at": "document_start"
         },
         {
@@ -23,7 +23,7 @@
                 "*://*.steamcommunity.com/workshop/*",
                 "*://*.steamcommunity.com/app/*/workshop/*"
             ],
-            "js": ["hydration-signal.js"],
+            "js": ["hydration-signal.js", "search-terms-hook.js"],
             "run_at": "document_start",
             "world": "MAIN"
         }
