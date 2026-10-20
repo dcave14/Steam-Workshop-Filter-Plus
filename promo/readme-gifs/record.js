@@ -1,14 +1,18 @@
 // record.js
-// Records the two README preview GIFs with the real extension loaded,
-// recreating the v1.2.0 ones on current Steam pages:
-//   workshop.gif    Project Zomboid browse page: Hide Subscribed removes the
-//                   subscribed mods, 5 Stars Only removes the lower-rated
-//                   ones, then Steam's sort menu (Top Rated) reloads the
-//                   results with both filters still applied
-//   collection.gif  "Genesis Mod Pack" (RimWorld, mixed 4/5-star items):
-//                   Hide Subscribed, then 5 Stars Only, then scroll the list
+// Records the README preview GIFs with the real extension loaded, on live
+// Steam pages:
+//   workshop.gif       Project Zomboid browse page: Hide Subscribed removes the
+//                      subscribed mods, 100+ Ratings and 5 Stars Only remove
+//                      the little-rated and lower-rated ones, then Steam's sort
+//                      menu (Top Rated) reloads the results with the filters on
+//   saved-filters.gif  RimWorld browse page: save a keyword from the sidebar,
+//                      then hide a creator from the card picker (with its
+//                      2.5-second undo window)
+//   collection.gif     "Genesis Mod Pack" (RimWorld, mixed 4/5-star items):
+//                      Hide Subscribed, 5 Stars Only and 100+ Ratings, with the
+//                      Total / After filters sizes updating, then scroll the list
 //
-// Usage: node record.js [--convert-only] [--only workshop|collection]
+// Usage: node record.js [--convert-only] [--only workshop|saved-filters|collection]
 //   (writes to ../out/readme-gifs/; needs ffmpeg on PATH; --convert-only
 //   re-encodes the existing .webm recordings without opening Steam)
 //
@@ -31,9 +35,6 @@ const puppeteer = require('../../perf/node_modules/puppeteer-core');
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const EXT_SRC = path.resolve(__dirname, '..', '..');
 const OUT = path.resolve(__dirname, '..', 'out', 'readme-gifs');
-const EXT_FILES = ['manifest.json', 'steam-dom.js', 'content.js', 'collection-row-align.js',
-    'hydration-signal.js', 'sort-popover-fit.js', 'styles.css', 'Steam-Workshop-Filter-Plus-Icon.png',
-    'saved-filters.js', 'saved-filters.css', 'search-terms-hook.js'];
 
 const VIEWPORT = { width: 1600, height: 900 };
 const GIF_FPS = 12;
@@ -43,11 +44,25 @@ const MARGIN_X = 1288;
 
 const WORKSHOP_URL = 'https://steamcommunity.com/workshop/browse/?appid=108600&browsesort=trend&section=readytouseitems';
 const COLLECTION_URL = 'https://steamcommunity.com/sharedfiles/filedetails/?id=3798004429';
+const SAVED_FILTERS_URL = 'https://steamcommunity.com/workshop/browse/?appid=294100&browsesort=trend&section=readytouseitems';
+
+// The files manifest.json lists, the same set build.js packages.
+function extensionFiles() {
+    const manifest = JSON.parse(fs.readFileSync(path.join(EXT_SRC, 'manifest.json'), 'utf8'));
+    const files = new Set(['manifest.json', ...Object.values(manifest.icons || {})]);
+    for (const script of manifest.content_scripts || []) {
+        for (const f of [...(script.js || []), ...(script.css || [])]) files.add(f);
+    }
+    return [...files];
+}
 
 function copyExtension() {
     // Chrome's Extensions.loadUnpacked rejects paths containing spaces.
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wshs-gif-'));
-    for (const file of EXT_FILES) fs.copyFileSync(path.join(EXT_SRC, file), path.join(dir, file));
+    for (const file of extensionFiles()) {
+        fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+        fs.copyFileSync(path.join(EXT_SRC, file), path.join(dir, file));
+    }
     return dir;
 }
 
@@ -181,6 +196,7 @@ async function smoothScroll(page, dy, steps) {
 
 const SORT_BUTTON = 'fn:() => [...document.querySelectorAll(\'div[role="button"][tabindex]\')]' +
     '.find(x => x.querySelector(\'svg[viewBox="0 0 32 18"]\'))';
+const HIDE_SUBSCRIBED = '.hide-subscribed-button:not(.star-filter-button):not(.ratings-filter-button)';
 const TOP_RATED = 'fn:() => [...document.querySelectorAll(\'[role="radio"]\')]' +
     '.find(x => x.textContent.trim() === \'Top Rated All Time\')';
 
@@ -201,10 +217,18 @@ async function recordWorkshop(page, webm) {
     const recorder = await page.screencast({ path: webm });
     await wait(1200);
     // 1. Hide Subscribed: the badged cards disappear.
-    await clickOn(page, '.hide-subscribed-button:not(.star-filter-button)');
+    await clickOn(page, HIDE_SUBSCRIBED);
     const row = await center(page, '.star-filter-button');
     await wait(1600);
-    // 2. 5 Stars Only: the lower-rated cards disappear.
+    // 2. 100+ Ratings: mods with few user ratings disappear.
+    await clickOn(page, '.ratings-filter-button');
+    await wait(700);
+    await moveTo(page, '[data-ratings="50"]', 15);
+    await wait(250);
+    await clickOn(page, '[data-ratings="100"]', 10);
+    await page.mouse.move(row.x, row.y - 40, { steps: 6 });
+    await wait(1600);
+    // 3. 5 Stars Only: the lower-rated cards disappear.
     await clickOn(page, '.star-filter-button');
     await wait(700);
     await moveTo(page, '.star-option[data-stars="4"]', 15);
@@ -214,7 +238,7 @@ async function recordWorkshop(page, webm) {
     // preview opens, back up to the controls row.
     await page.mouse.move(row.x, row.y - 40, { steps: 6 });
     await wait(1700);
-    // 3. Steam's sort menu: Top Rated reloads the results, filters still on.
+    // 4. Steam's sort menu: Top Rated reloads the results, filters still on.
     await clickOn(page, SORT_BUTTON);
     await wait(900);
     await clickOn(page, TOP_RATED, 15);
@@ -229,7 +253,8 @@ async function recordWorkshop(page, webm) {
 
 async function recordCollection(page, webm) {
     await page.goto(COLLECTION_URL, { waitUntil: 'load', timeout: 60000 });
-    await page.waitForSelector('.wshs-collection-controls.wshs-row-aligned', { timeout: 20000 });
+    await page.waitForSelector('.wshs-collection-sizes', { timeout: 30000 });
+    await page.waitForFunction(() => document.querySelector('.wshs-collection-sizes').getAttribute('aria-busy') === 'false', { timeout: 30000 });
     await wait(1200);
     console.log('collection mock', JSON.stringify(await page.evaluate(mockCollectionSubscriptions, 3)));
     await page.evaluate(() => window.scrollTo(0, 0));
@@ -238,16 +263,16 @@ async function recordCollection(page, webm) {
 
     const recorder = await page.screencast({ path: webm });
     await wait(600);
-    // Scroll down to the collection's item list and the controls.
+    // Scroll down to the collection sizes, the controls and the item list.
     const target = await page.evaluate(() => {
-        const c = document.querySelector('.subscribeCollection');
-        return c.getBoundingClientRect().top + window.scrollY - 120;
+        const c = document.querySelector('.wshs-collection-summary');
+        return c.getBoundingClientRect().top + window.scrollY - 90;
     });
     await smoothScroll(page, target, 45);
     await wait(1000);
     // 1. Hide Subscribed: the subscribed (checked) items disappear.
     await page.mouse.move(MARGIN_X, (await center(page, '.subscribeCollection')).y, { steps: 10 });
-    await clickOn(page, '.hide-subscribed-button:not(.star-filter-button)', 20);
+    await clickOn(page, HIDE_SUBSCRIBED, 20);
     await wait(1600);
     // 2. 5 Stars Only: the 4-star items disappear.
     const star = await center(page, '.star-filter-button');
@@ -257,13 +282,74 @@ async function recordCollection(page, webm) {
     await wait(250);
     await clickOn(page, '.star-option[data-stars="5"]', 10);
     // Leave the item list before Steam's hover preview opens.
-    await page.mouse.move(star.x, star.y - 40, { steps: 6 });
+    await page.mouse.move(MARGIN_X, star.y - 40, { steps: 8 });
     await wait(1500);
-    // Out to the right margin along the button row, then down the margin.
-    await page.mouse.move(MARGIN_X, star.y - 40, { steps: 20 });
+    // 3. 100+ Ratings: After filters drops again.
+    await clickOn(page, '.ratings-filter-button', 15);
+    await wait(700);
+    await moveTo(page, '[data-ratings="50"]', 15);
+    await wait(250);
+    await clickOn(page, '[data-ratings="100"]', 10);
+    await page.mouse.move(MARGIN_X, star.y - 40, { steps: 8 });
+    await wait(1800);
+    // Down the right margin.
     await page.mouse.move(MARGIN_X, 600, { steps: 15 });
     await smoothScroll(page, 900, 40);
     await wait(1200);
+    await recorder.stop();
+}
+
+// Types into the sidebar phrase box one key at a time, so the GIF shows it.
+async function typeSlowly(page, selector, text) {
+    await clickOn(page, selector, 20);
+    for (const ch of text) {
+        await page.keyboard.type(ch);
+        await wait(110);
+    }
+}
+
+// Marks the visible card author at index `skip` (page order) for the cursor.
+function pickAuthor(skip) {
+    const links = [...document.querySelectorAll('#CommunityTemplate a[href*="/myworkshopfiles"]')]
+        .filter(a => !a.closest('dialog, .wshs-saved-filters') && a.getBoundingClientRect().width > 0 &&
+            a.getBoundingClientRect().top > 140 && a.getBoundingClientRect().bottom < window.innerHeight - 60);
+    const a = links[skip];
+    if (!a) return null;
+    a.setAttribute('data-rec-author', 'true');
+    return true;
+}
+
+async function recordSavedFilters(page, webm) {
+    await page.goto(SAVED_FILTERS_URL, { waitUntil: 'load', timeout: 60000 });
+    await page.waitForSelector('.wshs-sf-input', { timeout: 30000 });
+    await wait(1500);
+    await page.evaluate(() => {
+        const c = document.querySelector('.wshs-injected-controls');
+        window.scrollTo(0, c.getBoundingClientRect().top + window.scrollY - 170);
+    });
+    await wait(300);
+    const box = await center(page, '.wshs-sf-input');
+    await page.mouse.move(box.x + 60, box.y - 120);
+    await wait(400);
+
+    const recorder = await page.screencast({ path: webm });
+    await wait(1000);
+    // 1. Save a keyword: every matching mod leaves the results.
+    await typeSlowly(page, '.wshs-sf-input', 'xenotype');
+    await wait(300);
+    await clickOn(page, '.wshs-sf-save', 12);
+    await page.mouse.move(box.x, box.y + 90, { steps: 10 });
+    await wait(3200);
+    // 2. Hide a creator from the card: the picker shows a 2.5 s undo window,
+    //    then the creator's mods go.
+    await page.evaluate(pickAuthor, 1);
+    await moveTo(page, '[data-rec-author]', 35);
+    await wait(700);
+    await clickOn(page, '.wshs-picker [data-action="hide"]', 8);
+    await wait(3300);
+    // Back out to the sidebar, where both saved filters are listed.
+    await page.mouse.move(box.x + 60, box.y - 80, { steps: 30 });
+    await wait(2000);
     await recorder.stop();
 }
 
@@ -309,6 +395,7 @@ async function withBrowser(fn) {
     // with a little margin; 10 fps keeps it under GitHub's 10 MB limit.
     const jobs = [
         ['workshop', recordWorkshop, null, 1200, GIF_FPS],
+        ['saved-filters', recordSavedFilters, null, 1200, GIF_FPS],
         ['collection', recordCollection, '1000:900:300:0', 1000, 10]
     ];
     const onlyAt = process.argv.indexOf('--only');

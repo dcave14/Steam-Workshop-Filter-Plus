@@ -1,5 +1,5 @@
 // compose.js
-// Builds the Chrome Web Store images from the real captures in
+// Builds the Chrome Web Store and Firefox Add-ons images from the real captures in
 // ../out/store-assets/raw/ (run capture.js first):
 //   screenshot-1..5.jpg   1280x800
 //   promo-small.jpg       440x280
@@ -17,7 +17,8 @@ const puppeteer = require('../../perf/node_modules/puppeteer-core');
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const OUT = path.resolve(__dirname, '..', 'out', 'store-assets');
 const RAW = path.join(OUT, 'raw');
-const ICON = path.resolve(__dirname, '..', '..', 'Steam-Workshop-Filter-Plus-Icon.png');
+// Full-size artwork; the packaged icons carry store padding.
+const ICON = path.resolve(__dirname, '..', '..', 'icons', 'icon-source.png');
 
 // Raw captures are 1600x1000 CSS px at 2x.
 const RAW_W = 1600;
@@ -93,16 +94,16 @@ const BROWSE_PATH = '/workshop/browse/?appid=294100';
 const COLLECTION_PATH = '/sharedfiles/filedetails/?id=3811511129';
 
 const SCREENSHOTS = [
-    { n: 1, eyebrow: 'Star rating', title: 'Only see the mods worth your time.',
+    { n: 1, eyebrow: 'Saved filters', title: 'Hide any keyword or creator, saved per game.',
+      raw: 'browse-saved', url: BROWSE_PATH, crop: { x: 15, y: 40, w: 947 } },
+    { n: 2, eyebrow: 'Title words', title: 'Click a word in any title to filter by it.',
+      raw: 'browse-word', url: BROWSE_PATH, crop: { x: 650, y: 60, w: 935 } },
+    { n: 3, eyebrow: 'Ratings + stars', title: 'Hide what you have. Keep what’s rated well.',
       raw: 'browse-star-menu', url: BROWSE_PATH, crop: { x: 340, y: 100, w: 1250 } },
-    { n: 2, eyebrow: 'Hide subscribed', title: 'One click hides everything you already have.',
-      raw: 'browse-filtered', url: BROWSE_PATH, crop: { x: 340, y: 100, w: 1250 } },
-    { n: 3, eyebrow: 'Built in', title: 'Sits right next to Steam\u2019s own sort menu.',
-      raw: 'browse-sort-menu', url: BROWSE_PATH, crop: { x: 340, y: 100, w: 1250 } },
-    { n: 4, eyebrow: 'Collections', title: 'Works on collections too.',
-      raw: 'collection', url: COLLECTION_PATH, crop: { x: 300, y: 160, w: 700 } },
-    { n: 5, eyebrow: 'Collections', title: 'Filter a 200-mod collection down to the best.',
-      raw: 'collection-star-menu', url: COLLECTION_PATH, crop: { x: 300, y: 160, w: 700 } }
+    { n: 4, eyebrow: 'Collection sizes', title: 'See how big a collection is, before and after filters.',
+      raw: 'collection-sizes', url: COLLECTION_PATH, crop: { x: 315, y: 100, w: 680 } },
+    { n: 5, eyebrow: 'Collections', title: 'Your saved filters work on collections too.',
+      raw: 'collection-saved', url: COLLECTION_PATH, crop: { x: 315, y: 250, w: 680 } }
 ];
 
 function screenshotHtml(s) {
@@ -128,7 +129,7 @@ p b { color: #eef3f8; font-weight: 600; }
 </style></head><body><div class="glow"></div>
 <div class="wrap">
   <div class="brand"><img src="${dataUri(ICON)}"><h1>Steam Workshop<br>Filter Plus</h1></div>
-  <p><b>Hide subscribed mods</b> and <b>filter by star rating</b> on Workshop pages and collections.</p>
+  <p><b>Hide subscribed mods</b>, <b>filter by rating</b> and <b>save keyword filters</b> on Workshop pages and collections.</p>
 </div></body></html>`;
 }
 
@@ -147,11 +148,12 @@ li::before { content: ''; width: 8px; height: 8px; border-radius: 50%; backgroun
   <div class="brand"><img src="${dataUri(ICON)}"><h1>Steam Workshop<br>Filter Plus</h1></div>
   <ul>
     <li>Hide mods you\u2019re already subscribed to</li>
-    <li>Filter by star rating</li>
-    <li>Works on Workshop pages and collections</li>
+    <li>Filter by stars and number of ratings</li>
+    <li>Save keyword and creator filters per game</li>
+    <li>Collection sizes before and after filters</li>
   </ul>
 </div>
-${windowHtml({ x: 620, y: 60, w: 740, h: 440, raw: 'browse-star-menu', crop: { x: 650, y: 100, w: 930 }, url: BROWSE_PATH })}
+${windowHtml({ x: 620, y: 60, w: 740, h: 440, raw: 'browse-saved', crop: { x: 15, y: 40, w: 930 }, url: BROWSE_PATH })}
 </body></html>`;
 }
 

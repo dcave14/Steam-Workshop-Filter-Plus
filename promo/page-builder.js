@@ -43,7 +43,7 @@
         bar.innerHTML = `
             <span class="nav-ico">&#8592;</span><span class="nav-ico">&#8594;</span><span class="nav-ico">&#8635;</span>
             <div class="omnibox"><span class="lock"></span><span><span class="host"></span><span class="path"></span></span></div>
-            <div class="ext-pin"><img src="../Steam-Workshop-Filter-Plus-Icon.png" alt=""><span class="ext-badge">ON</span></div>
+            <div class="ext-pin"><img src="../icons/icon-source.png" alt=""><span class="ext-badge">ON</span></div>
             <div class="avatar"></div>`;
         browser.appendChild(bar);
         return {

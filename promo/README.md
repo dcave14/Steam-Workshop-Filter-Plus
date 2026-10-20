@@ -1,6 +1,7 @@
 # Promo video
 
 Source for the 40-second showcase video used on GitHub and the Chrome Web Store.
+Store listing text for both stores is in `store-listing.md`.
 The scene is plain HTML/CSS/JS rendered frame by frame in headless Chrome, so
 every export is identical and edits are a re-render away.
 
@@ -48,9 +49,9 @@ node capture.js      # raw captures of browse and collection pages -> out/store-
 node compose.js      # Chrome Web Store screenshots (1280x800) and promo tiles -> out/store-assets/
 
 cd ../readme-gifs
-node record.js       # README GIFs -> out/readme-gifs/ (copy to ../docs/ for the README)
+node record.js       # README GIFs (workshop, saved-filters, collection) -> out/readme-gifs/ (copy to ../docs/)
 node record.js --convert-only           # re-encode the last recordings only
-node record.js --only collection        # record one GIF
+node record.js --only saved-filters     # record one GIF
 ```
 
 The GIFs are recorded logged out, so `record.js` marks a few items subscribed the
