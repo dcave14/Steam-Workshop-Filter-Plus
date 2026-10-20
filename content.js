@@ -1,26 +1,16 @@
 // content.js
 let isHidingSubscribed = false;
 let currentStarFilter = 0; // 0 means show all
+let minimumRatings = 0;
+let renderRatingsPreference = null;
 let widthSync = null;
 let widthSyncCleanup = null;
-let lastOverrunLog = null;
 let fontsReadyHooked = false;
 
 // One uniform font F on all three controls (star, hide and the native sort
 // label). 13px keeps the widest known label on one line at the logged-in card
 // width W=262.5 with the 8px internal-gap floor (Iworst + 78 <= W).
 const BUTTON_FONT_SIZE = '13px';
-
-// Shared chrome: horizontal padding 20 + left icon 25 + right icon/slot 17.
-const BUTTON_CHROME_WIDTH = 62;
-const GAP_FLOOR = 8;
-
-// When a card column is narrower than the worst-case label needs at 13px,
-// the font scales down so the buttons stay exactly card-width (flush with the
-// columns) instead of overhanging them. Below this size the buttons overrun
-// the card width instead.
-const MIN_FIT_FONT_PX = 10;
-const GAP_CEIL = 20;
 
 // Frozen fallback ink for the worst known label ("Most Popular (Three Months)"
 // measures ~177.2px at F). Used only when the measuring probe fails entirely
@@ -58,6 +48,7 @@ const OWN_LABEL_STATES = [
 // Iworst is frozen per page load (re-measured only when font metrics change),
 // never from live label text.
 let worstCaseInk = null;
+let worstCaseOwnInk = 0;
 let worstCaseInkLabel = '';
 
 // Steam's new layout is server-rendered and hydrated by React after the page
@@ -242,6 +233,62 @@ function createButtons() {
     hideButton.appendChild(createHideIcon());
     hideButton.appendChild(hideLabel);
     hideButton.appendChild(toggleSlot);
+    const ratingsContainer = document.createElement('div');
+    ratingsContainer.className = 'wshs-ratings-control';
+    ratingsContainer.style.position = 'relative';
+    const ratingsButton = document.createElement('button');
+    ratingsButton.type = 'button';
+    ratingsButton.className = 'hide-subscribed-button ratings-filter-button';
+    ratingsButton.setAttribute('aria-haspopup', 'true');
+    ratingsButton.setAttribute('aria-expanded', 'false');
+    ratingsButton.title = 'Minimum number of user ratings. Filters items on this page.';
+    const ratingsIcon = createSvgIcon('wshs-left-icon', '0 0 24 24');
+    ratingsIcon.appendChild(createSvgPath('M4 3h16v14H9l-5 4V3zm3 4v2h10V7H7zm0 4v2h7v-2H7z'));
+    const ratingsLabel = document.createElement('span'); ratingsLabel.className = 'wshs-button-label';
+    const ratingsMenu = document.createElement('div'); ratingsMenu.className = 'star-dropdown-content wshs-ratings-menu';
+    ratingsMenu.setAttribute('role', 'radiogroup'); ratingsMenu.setAttribute('aria-label', 'Minimum number of ratings');
+    const ratingsOptions = [0,10,25,50,100,250,500,1000,5000];
+    for (const count of ratingsOptions) {
+        const option = document.createElement('div'); option.className = 'star-option';
+        option.dataset.ratings = String(count); option.setAttribute('role', 'radio'); option.tabIndex = 0;
+        option.textContent = count ? count.toLocaleString('en-US') + '+ Ratings' : 'Any number';
+        ratingsMenu.appendChild(option);
+    }
+    const ratingsStatus = document.createElement('div'); ratingsStatus.className = 'wshs-ratings-status'; ratingsStatus.setAttribute('role', 'status');
+    ratingsMenu.appendChild(ratingsStatus);
+    const ratingsRetry = document.createElement('button'); ratingsRetry.type = 'button'; ratingsRetry.className = 'wshs-ratings-retry'; ratingsRetry.textContent = 'Retry unavailable counts'; ratingsRetry.hidden = true;
+    ratingsRetry.addEventListener('click', e => {
+        e.stopPropagation();
+        const ids = (window.WSHSDom && window.WSHSDom.isNewLayout() ? window.WSHSDom.enumerateCards() : Array.from(document.querySelectorAll('.collectionItem')).map(root=>({id:root.id.replace('sharedfile_','')}))).map(item=>item.id);
+        window.WSHSMetadata.request(ids.filter(id=>!Number.isSafeInteger(window.WSHSMetadata.get(id)?.ratings)),{fields:['ratings'],force:true});
+    });
+    ratingsMenu.appendChild(ratingsRetry);
+    function renderRatings() {
+        setText(ratingsLabel, minimumRatings ? minimumRatings.toLocaleString('en-US') + '+ Ratings' : 'Ratings');
+        ratingsButton.classList.toggle('active', minimumRatings > 0);
+        for (const option of ratingsMenu.querySelectorAll('[data-ratings]')) option.setAttribute('aria-checked', String(Number(option.dataset.ratings) === minimumRatings));
+    }
+    renderRatingsPreference = renderRatings;
+    renderRatings();
+    function closeRatings() { ratingsMenu.classList.remove('show'); ratingsButton.setAttribute('aria-expanded', 'false'); }
+    ratingsButton.addEventListener('click', e => {
+        e.stopPropagation(); dropdownContent.classList.remove('show');
+        const open = !ratingsMenu.classList.contains('show'); ratingsMenu.classList.toggle('show', open); ratingsButton.setAttribute('aria-expanded', String(open));
+    });
+    function chooseRatings(e) {
+        const option = e.target.closest('[data-ratings]'); if (!option) return;
+        e.stopPropagation(); minimumRatings = Number(option.dataset.ratings); renderRatings(); closeRatings();
+        chrome.storage.local.set({ minimumRatings }); applyFilters(); if (widthSync) widthSync();
+    }
+    ratingsMenu.addEventListener('click', chooseRatings);
+    ratingsMenu.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); chooseRatings(e); }
+        if (e.key === 'Escape') { e.stopPropagation(); closeRatings(); ratingsButton.focus(); }
+    });
+    document.addEventListener('click', closeRatings);
+    ratingsButton.addEventListener('keydown', e => { if (e.key === 'Escape') closeRatings(); });
+    ratingsButton.append(ratingsIcon, ratingsLabel, createChevronIcon());
+    ratingsContainer.append(ratingsButton, ratingsMenu);
     // Our clicks stop at our controls: Steam's document-level click handler
     // (fnCancelHover in shared_global.js) reads computed styles across the
     // whole item list and cost ~45ms per click on large collection pages.
@@ -284,6 +331,7 @@ function createButtons() {
     // Add event listeners for star filter
     starButton.addEventListener('click', (e) => {
         e.stopPropagation();
+        closeRatings();
         dropdownContent.classList.toggle('show');
     });
 
@@ -310,7 +358,9 @@ function createButtons() {
     });
 
     // Load saved states
-    chrome.storage.local.get(['hideSubscribed', 'starFilter'], (data) => {
+    chrome.storage.local.get(['hideSubscribed', 'starFilter', 'minimumRatings'], (data) => {
+        minimumRatings = ratingsOptions.includes(data.minimumRatings) ? data.minimumRatings : 0;
+        renderRatings();
         if (data.hideSubscribed) {
             isHidingSubscribed = true;
         }
@@ -321,7 +371,7 @@ function createButtons() {
         renderStarLabel();
 
         // Apply both filters if either is active
-        if (data.hideSubscribed || data.starFilter > 0) {
+        if (data.hideSubscribed || data.starFilter > 0 || minimumRatings > 0) {
             applyFilters();
         }
         if (widthSync) widthSync();
@@ -338,8 +388,9 @@ function createButtons() {
     if (isCollectionArea) {
         injectedControls.className += ' wshs-collection-controls';
     }
-    injectedControls.appendChild(starFilterContainer);
     injectedControls.appendChild(hideButton);
+    injectedControls.appendChild(ratingsContainer);
+    injectedControls.appendChild(starFilterContainer);
 
     // The sort button is re-resolved on every sync because React can replace
     // the node during hydration, which would otherwise freeze the width sync.
@@ -408,6 +459,7 @@ function createButtons() {
         let measured;
         try {
             const own = maxInk(OWN_LABEL_STATES, starButton);
+            worstCaseOwnInk = Math.max(own.ink, maxInk(['Ratings', '5,000+ Ratings'], ratingsButton).ink);
             const sortSource = sortButton && sortButton.isConnected ? sortButton : starButton;
             const native = maxInk(labels, sortSource);
             measured = native.ink >= own.ink ? native : own;
@@ -449,26 +501,21 @@ function createButtons() {
     // normalized to 10px to match the injected buttons.
     function applyNativeSortAnatomy(button) {
         if (!button) return;
-        button.style.justifyContent = 'space-between';
-        button.style.paddingLeft = '10px';
-        button.style.paddingRight = '10px';
+        button.style.position = 'relative';
+        button.style.justifyContent = 'center';
+        button.style.paddingLeft = '30px';
+        button.style.paddingRight = '30px';
+        const icons = button.querySelectorAll('svg');
+        for (let i=0;i<icons.length;i++) {
+            icons[i].style.position='absolute'; icons[i].style.top='50%'; icons[i].style.transform='translateY(-50%)';
+            icons[i].style.left=i===0?'8px':'auto'; icons[i].style.right=i===0?'auto':'8px';
+        }
+        for (const span of button.querySelectorAll('span')) if (!span.children.length && span.textContent.trim()) {
+            span.style.textAlign='center';span.style.flex='1 1 auto';span.style.minWidth='0';
+        }
         // Same drop shadow as the injected buttons and the dropdowns
         // (styles.css).
         button.style.boxShadow = '1px 1px 10px 0 rgba(0, 0, 0, 0.6)';
-    }
-
-    function clearButtonGeometry(button) {
-        if (!button) return;
-        button.style.boxSizing = '';
-        button.style.width = '';
-        button.style.minWidth = '';
-        button.style.height = '';
-        button.style.minHeight = '';
-        button.style.gap = '';
-        button.style.justifyContent = '';
-        button.style.paddingLeft = '';
-        button.style.paddingRight = '';
-        button.style.boxShadow = '';
     }
 
     function setButtonWidth(button, width, gap) {
@@ -477,16 +524,6 @@ function createButtons() {
         button.style.minWidth = width + 'px';
         button.style.gap = gap + 'px';
         button.style.height = '';
-    }
-
-    function logOverrun(overrun) {
-        const value = Math.round(overrun * 10) / 10;
-        if (value === lastOverrunLog) return;
-        lastOverrunLog = value;
-        if (value > 0) {
-            console.debug('[WSHS] shared button width overrun +' + value +
-                'px (frozen worst-case label needs more than the card width)');
-        }
     }
 
     // Geometry observers: the sort button and its wrapper (React can clobber
@@ -543,111 +580,83 @@ function createButtons() {
         }
     }
 
-    // Round-4 geometry: all three buttons (including the native sort button)
-    // share one width - the mod card width, plus a symmetric shared overrun
-    // only when the frozen worst-case label cannot fit at the 8px internal-gap
-    // floor. The group tiles the three rightmost card columns: [star][hide]
-    // sits immediately left of the sort wrapper with the card gap between
-    // them, and the native sort button keeps the grid's right edge, so the
-    // columns tile by construction. One shared height is forced on all three.
+    // Four controls fit one row on wide grids. At narrower widths they use
+    // two equal columns, keeping readable labels and the native sort last.
+    let toolbarLayout = null;
+    function restoreToolbarLayout() {
+        if (!toolbarLayout) return;
+        const saved = toolbarLayout;
+        for (const [key,value] of Object.entries(saved.parentStyle)) saved.parent.style[key] = value;
+        for (const [key,value] of Object.entries(saved.wrapperStyle)) saved.wrapper.style[key] = value;
+        toolbarLayout = null;
+    }
     function resync() {
-        // Collection-page controls keep their natural width in the native
-        // button row; there is no sort button to tile with there.
         if (isCollectionArea) return;
         const liveSort = getLiveSortInfo();
-        const liveSortButton = liveSort ? liveSort.button : null;
-        if (liveSortButton) applyUniformFont(liveSortButton);
-        const rowGap = liveSortButton ? getRowColumnGap(liveSortButton) : 0;
-        const geometry = (isNewLayout && window.WSHSDom && window.WSHSDom.getCardGeometry)
-            ? window.WSHSDom.getCardGeometry()
-            : null;
-
+        const sort = liveSort && liveSort.button;
+        const geometry = isNewLayout && window.WSHSDom ? window.WSHSDom.getCardGeometry() : null;
         observeGeometry(liveSort, geometry);
-
-        // Fallback (legacy layout, unmeasurable cards, fewer than three card
-        // columns, implausibly narrow card): our two buttons only, equal width
-        // to each other, gap G (row column-gap else 10px). Width is the same
-        // frozen constant as the main path (Iworst + chrome + 2 x gap floor),
-        // so it cannot move with labels. The native sort button gets its
-        // natural geometry back.
-        if (!liveSortButton || !geometry || geometry.columns < 3 || !(geometry.width >= 120)) {
-            starButton.style.fontSize = '';
-            hideButton.style.fontSize = '';
-            clearButtonGeometry(starButton);
-            clearButtonGeometry(hideButton);
-            clearButtonGeometry(liveSortButton);
-            const iworst = getWorstCaseInk(liveSortButton);
-            if (iworst > 0) {
-                const width = iworst + BUTTON_CHROME_WIDTH + 2 * GAP_FLOOR;
-                setButtonWidth(starButton, width, GAP_FLOOR);
-                setButtonWidth(hideButton, width, GAP_FLOOR);
-            } else {
-                const width = IWORST_FALLBACK_ESTIMATE + BUTTON_CHROME_WIDTH + 2 * GAP_FLOOR;
-                setButtonWidth(starButton, width, GAP_FLOOR);
-                setButtonWidth(hideButton, width, GAP_FLOOR);
-            }
-            const gap = rowGap > 0 ? rowGap : 10;
-            injectedControls.style.gap = gap + 'px';
-            if (liveSortButton) {
-                injectedControls.style.marginLeft = 'auto';
-                injectedControls.style.marginRight = rowGap > 0 ? '' : gap + 'px';
-            } else {
-                injectedControls.style.marginLeft = '';
-                injectedControls.style.marginRight = '';
-            }
+        const buttons = [hideButton, ratingsButton, starButton];
+        if (!sort || !liveSort.wrapper.parentElement) {
+            const width = 230;
+            for (const button of buttons) setButtonWidth(button, width, 4);
+            injectedControls.style.flexWrap = 'wrap';
             return;
         }
-
-        // Geometry is a pure function of the card grid (W) and the frozen
-        // worst-case ink Iworst (measured at 13px); live label text never feeds
-        // width or gap. The buttons are card-width so they sit flush on the
-        // columns; when the worst-case label does not fit at 13px with the 8px
-        // gap floor, the font scales down (ink scales linearly with font size)
-        // until it does, down to MIN_FIT_FONT_PX. Only below that do the
-        // buttons overrun W.
-        const iworst13 = getWorstCaseInk(liveSortButton) || IWORST_FALLBACK_ESTIMATE;
-        const baseFont = parseFloat(BUTTON_FONT_SIZE);
-        const labelBudget = geometry.width - BUTTON_CHROME_WIDTH - 2 * GAP_FLOOR;
-        let fontPx = baseFont;
-        if (iworst13 > labelBudget) {
-            fontPx = Math.max(MIN_FIT_FONT_PX, Math.floor(baseFont * labelBudget / iworst13 * 10) / 10);
+        const parent = liveSort.wrapper.parentElement;
+        if (!toolbarLayout || toolbarLayout.parent !== parent || toolbarLayout.wrapper !== liveSort.wrapper) {
+            restoreToolbarLayout();
+            const parentStyle = {}, wrapperStyle = {};
+            for (const key of ['position','minHeight','alignItems']) parentStyle[key] = parent.style[key];
+            for (const key of ['position','right','left','top','bottom','width']) wrapperStyle[key] = liveSort.wrapper.style[key];
+            toolbarLayout = {parent, wrapper:liveSort.wrapper, parentStyle, wrapperStyle};
         }
-        const iworst = iworst13 * fontPx / baseFont;
-        const fontValue = fontPx + 'px';
-        starButton.style.fontSize = fontValue;
-        hideButton.style.fontSize = fontValue;
-        applyUniformFont(liveSortButton, fontValue);
-        const width = Math.max(geometry.width, iworst + BUTTON_CHROME_WIDTH + 2 * GAP_FLOOR);
-        const gap = Math.max(GAP_FLOOR, Math.min(GAP_CEIL,
-            (geometry.width - iworst - BUTTON_CHROME_WIDTH) / 2));
-        logOverrun(width - geometry.width);
-
-        // Width first (removes any wrap), then the tallest natural height
-        // measured with the width in place, forced on all three.
-        setButtonWidth(starButton, width, gap);
-        setButtonWidth(hideButton, width, gap);
-        setButtonWidth(liveSortButton, width, gap);
-        applyNativeSortAnatomy(liveSortButton);
-        void injectedControls.offsetHeight;
-        const height = Math.max(
-            starButton.getBoundingClientRect().height,
-            hideButton.getBoundingClientRect().height,
-            liveSortButton.getBoundingClientRect().height
-        );
-        if (height > 0) {
-            starButton.style.height = height + 'px';
-            hideButton.style.height = height + 'px';
-            liveSortButton.style.height = height + 'px';
+        const gap = geometry && geometry.gap > 0 ? geometry.gap : 10;
+        const columns = geometry ? Math.min(4, geometry.columns) : 1;
+        const span = geometry ? geometry.width * columns + gap * (columns-1) : Math.max(220,parent.clientWidth);
+        const wideCell = geometry ? columns >= 4 ? geometry.width : (span-geometry.width-3*gap)/3 : 0;
+        const wide = columns >= 4 || (columns >= 3 && wideCell >= 165);
+        const twoColumns = !wide && span >= 380;
+        const cell = wide ? wideCell : twoColumns ? (span-gap)/2 : span;
+        const sortWidth = wide ? geometry.width : cell;
+        const worstSort = getWorstCaseInk(sort) || IWORST_FALLBACK_ESTIMATE;
+        const ownInk = worstCaseOwnInk || 120;
+        const scale = Math.min(1,(cell-56)/ownInk,(sortWidth-68)/worstSort);
+        const font = Math.max(10,Math.floor(13*scale*10)/10)+'px';
+        for (const button of buttons) {
+            applyUniformFont(button,font);
+            setButtonWidth(button,cell,4);
+            button.style.height = '';
         }
-
-        // External gaps equal the card gap: the wrapper's own gap covers
-        // star->hide; the row's flex column-gap covers part of hide->sort, so
-        // a margin supplies the remainder.
-        const cardGap = geometry.gap > 0 ? geometry.gap : 0;
-        injectedControls.style.gap = cardGap + 'px';
-        injectedControls.style.marginLeft = 'auto';
-        injectedControls.style.marginRight = Math.max(0, cardGap - rowGap) + 'px';
+        applyUniformFont(sort,font);setButtonWidth(sort,sortWidth,6);sort.style.height = '';
+        applyNativeSortAnatomy(sort);
+        const height = Math.max(38,...buttons.map(b=>b.getBoundingClientRect().height),sort.getBoundingClientRect().height);
+        for (const button of [...buttons,sort]) button.style.height=height+'px';
+        injectedControls.classList.add('wshs-four-filter-controls');
+        injectedControls.style.marginLeft='auto';
+        injectedControls.style.gap=gap+'px';
+        injectedControls.style.flexWrap='nowrap';
+        liveSort.wrapper.style.width=sortWidth+'px';
+        if (wide) {
+            for (const [key,value] of Object.entries(toolbarLayout.parentStyle)) parent.style[key]=value;
+            for (const key of ['position','right','left','top','bottom']) liveSort.wrapper.style[key]=toolbarLayout.wrapperStyle[key];
+            injectedControls.style.display='flex';
+            injectedControls.style.width=(span-sortWidth-gap)+'px';
+            injectedControls.style.marginRight=Math.max(0,gap-getRowColumnGap(sort))+'px';
+        } else {
+            if (getComputedStyle(parent).position==='static') parent.style.position='relative';
+            parent.style.alignItems='flex-start';
+            parent.style.minHeight=(twoColumns?2*height+gap:4*height+3*gap)+'px';
+            injectedControls.style.display='grid';
+            injectedControls.style.gridTemplateColumns=twoColumns?'repeat(2,minmax(0,1fr))':'1fr';
+            injectedControls.style.width=span+'px';
+            injectedControls.style.marginRight='0px';
+            liveSort.wrapper.style.position='absolute';
+            liveSort.wrapper.style.right='0px';liveSort.wrapper.style.bottom='0px';
+            liveSort.wrapper.style.left='auto';liveSort.wrapper.style.top='auto';
+        }
     }
+
     widthSync = resync;
 
     // New layout: immediately left of the native sort button's wrapper. Legacy
@@ -664,6 +673,7 @@ function createButtons() {
 
     window.addEventListener('resize', resync);
     widthSyncCleanup = () => {
+        restoreToolbarLayout();
         window.removeEventListener('resize', resync);
         if (sortResizeObserver) sortResizeObserver.disconnect();
         if (cardResizeObserver) cardResizeObserver.disconnect();
@@ -723,6 +733,7 @@ function applyFilters() {
             isHidingSubscribed: isHidingSubscribed,
             currentStarFilter: currentStarFilter
         });
+        applyRatingCountFilter();
         return;
     }
 
@@ -737,14 +748,44 @@ function applyFilters() {
         .find(elements => elements.length > 0) || document.querySelectorAll(selectors[2]);
 
     Array.from(itemsToFilter).forEach(item => {
-        const starRating = getStarRating(item);
-        const isStarFilterPassed = currentStarFilter === 0 || starRating >= currentStarFilter;
+        const isStarFilterPassed = currentStarFilter === 0 || getStarRating(item) >= currentStarFilter;
         const isSubscriptionFilterPassed = !isHidingSubscribed || !isSubscribed(item);
         const shouldHideItem = !isStarFilterPassed || !isSubscriptionFilterPassed;
 
         item.classList.toggle('hidden-item', shouldHideItem);
     });
+    applyRatingCountFilter();
 }
+
+function applyRatingCountFilter() {
+    if (!window.WSHSMetadata) return;
+    if (!minimumRatings) {
+        document.querySelectorAll('.wshs-ratings-filtered').forEach(item => item.classList.remove('wshs-ratings-filtered'));
+        const status = document.querySelector('.wshs-ratings-status');
+        if (status) setText(status, 'Minimum number of user ratings.');
+        const retry = document.querySelector('.wshs-ratings-retry'); if (retry) retry.hidden = true;
+        return;
+    }
+    const modern = window.WSHSDom && window.WSHSDom.isNewLayout();
+    if (modern) window.WSHSDom.primeMetadata();
+    const items = modern ? window.WSHSDom.enumerateCards() : Array.from(document.querySelectorAll('.collectionItem')).map(root => {
+        const link = root.querySelector('.collectionItemDetails > a');
+        const match = link && /[?&]id=(\d+)/.exec(link.href); return {root,id:match&&match[1]};
+    });
+    let unknown = 0, loading = false;
+    for (const item of items) {
+        const data = window.WSHSMetadata.get(item.id);
+        const known = data && Number.isSafeInteger(data.ratings);
+        item.root.classList.toggle('wshs-ratings-filtered', !!(minimumRatings && known && data.ratings < minimumRatings));
+        if (minimumRatings && !known) { unknown++; if (window.WSHSMetadata.pending(item.id)) loading = true; }
+    }
+    const status = document.querySelector('.wshs-ratings-status');
+    if (status) setText(status, loading ? 'Loading rating counts…' : unknown ? unknown + ' counts unavailable; these mods stay visible.' : 'Minimum number of user ratings.');
+    const retry = document.querySelector('.wshs-ratings-retry'); if (retry) retry.hidden = !unknown || loading;
+    if (minimumRatings && unknown) window.WSHSMetadata.request(items.map(item=>item.id).filter(Boolean),{fields:['ratings']});
+}
+
+if (window.WSHSMetadata) window.WSHSMetadata.onChange(() => { if (minimumRatings) applyRatingCountFilter(); });
 
 function toggleSubscribedItems() {
     const button = document.querySelector('.hide-subscribed-button:not(.star-filter-button)');
@@ -767,7 +808,7 @@ function toggleSubscribedItems() {
 
 function applyFiltersIfNeeded() {
     createButtons();
-    if (isHidingSubscribed || currentStarFilter > 0) {
+    if (isHidingSubscribed || currentStarFilter > 0 || minimumRatings > 0) {
         applyFilters();
     }
     // Any DOM change (added nodes branch) re-evaluates the geometry from the
@@ -777,12 +818,21 @@ function applyFiltersIfNeeded() {
 }
 
 function loadFilters() {
-    chrome.storage.local.get(['hideSubscribed', 'starFilter'], (data) => {
+    chrome.storage.local.get(['hideSubscribed', 'starFilter', 'minimumRatings'], (data) => {
+        minimumRatings = [0,10,25,50,100,250,500,1000,5000].includes(data.minimumRatings) ? data.minimumRatings : 0;
         isHidingSubscribed = data.hideSubscribed || false;
         currentStarFilter = data.starFilter || 0;
         applyFiltersIfNeeded();
     });
 }
+
+chrome.storage.onChanged.addListener((changes,area) => {
+    if (area !== 'local' || !changes.minimumRatings) return;
+    const value = changes.minimumRatings.newValue;
+    minimumRatings = [0,10,25,50,100,250,500,1000,5000].includes(value) ? value : 0;
+    if (renderRatingsPreference) renderRatingsPreference();
+    applyFilters(); if (widthSync) widthSync();
+});
 
 function init() {
     if (window.WSHSDom && window.WSHSDom.onStatusUpdate) {
@@ -843,7 +893,7 @@ const observer = new MutationObserver((mutations) => {
         // Our own label/state changes (star or hide click) already ran the
         // filters synchronously; re-running them here doubled the click cost.
         const target = mutation.target.nodeType === 1 ? mutation.target : mutation.target.parentElement;
-        if (target && target.closest('.wshs-injected-controls')) continue;
+        if (target && target.closest('.wshs-injected-controls, .wshs-saved-filters, .wshs-picker, .wshs-collection-summary')) continue;
         if (mutation.addedNodes.length) {
             scheduleDomWork(2);
             return;

@@ -10,6 +10,9 @@
 // hydration mismatch (#418). The signal is the data-wshs-hydrated attribute
 // on <html>: attributes are shared across worlds and content.js's document
 // MutationObserver already watches attributes, so no messaging is needed.
+// Saved Filters modifies a separate Suspense boundary in the sidebar. Steam's
+// root hydration flag can precede that boundary, so also check its handlers.
+// data-wshs-page-hydrated carries that stronger signal across script worlds.
 //
 // If the row never shows a fiber key (legacy page, layout change, React
 // internals renamed), polling stops after MAX_WAIT_MS and content.js keeps its
@@ -31,6 +34,38 @@
         return false;
     }
 
+    function hasHydratedClickHandler(node) {
+        var fiber = null;
+        var props = null;
+        var keys = Object.keys(node);
+        for (var i = 0; i < keys.length; i++) {
+            if (keys[i].indexOf('__reactFiber$') === 0) fiber = node[keys[i]];
+            if (keys[i].indexOf('__reactProps$') === 0) props = node[keys[i]];
+        }
+        if (!fiber || !props || typeof props.onClick !== 'function') return false;
+        // A parent Suspense/root boundary can still be dehydrated even after
+        // host nodes appear. Do not insert siblings into that subtree yet.
+        for (var current = fiber; current; current = current.return) {
+            var state = current.memoizedState;
+            if (state && (state.dehydrated || state.isDehydrated)) return false;
+        }
+        return true;
+    }
+
+    function sidebarIsHydrated() {
+        var svgs = document.querySelectorAll('#CommunityTemplate [role="button"] > svg[viewBox="0 0 14 14"]');
+        var rows = 0;
+        for (var i = 0; i < svgs.length; i++) {
+            if (svgs[i].closest('.wshs-saved-filters')) continue;
+            var row = svgs[i].parentElement.parentElement;
+            if (row.children.length < 3 || !row.children[0].matches('[role="button"]') ||
+                !row.children[1].matches('[role="button"]')) continue;
+            rows++;
+            if (!hasHydratedClickHandler(row.children[0]) || !hasHydratedClickHandler(row.children[1])) return false;
+        }
+        return rows > 0;
+    }
+
     // Same structural match as steam-dom.js findSortButtonIn(): a
     // div[role=button][tabindex] containing the 12x8 chevron, preferring the
     // one that also holds the 32x18 sort glyph.
@@ -50,12 +85,22 @@
 
     function check() {
         var row = findSortRow();
-        if (row && hasFiber(row)) {
-            document.documentElement.setAttribute('data-wshs-hydrated', '1');
-            return;
+        var root = document.documentElement;
+        if (row && !root.hasAttribute('data-wshs-page-hydrated')) {
+            root.setAttribute('data-wshs-page-hydrated', '0');
         }
-        if (Date.now() - started < MAX_WAIT_MS) {
+        var rowReady = row && hasFiber(row);
+        if (rowReady && !document.documentElement.hasAttribute('data-wshs-hydrated')) {
+            document.documentElement.setAttribute('data-wshs-hydrated', '1');
+        }
+        var pageReady = !!(window.SSR && window.SSR.hydrated === true && sidebarIsHydrated());
+        if (pageReady) root.setAttribute('data-wshs-page-hydrated', '1');
+        if ((!rowReady || !pageReady) && Date.now() - started < MAX_WAIT_MS) {
             setTimeout(check, POLL_MS);
+        } else if (!pageReady && root.getAttribute('data-wshs-page-hydrated') === '0') {
+            // Unknown/new Steam internals: release the load-plus-quiet fallback
+            // only after the bounded readiness probe has expired.
+            root.removeAttribute('data-wshs-page-hydrated');
         }
     }
 

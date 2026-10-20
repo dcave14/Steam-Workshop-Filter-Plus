@@ -3,7 +3,7 @@
   "private": true,
   "description": "Performance test for the extension on live Steam pages",
   "scripts": {
-    "perf": "node perf-test.js"
+    "perf": "node runtime-perf.js --runs 1"
   },
   "dependencies": {
     "puppeteer-core": "^25.12.0"

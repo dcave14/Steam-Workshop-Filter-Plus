@@ -4,7 +4,7 @@
 //
 // Single responsibility: append the saved keyword filters (saved-filters.js)
 // to the search text of Steam's browse requests, so Steam's server applies
-// them to title, description and tags while the address bar and search box
+// them to mod titles, optionally including descriptions, while the address bar and search box
 // keep showing only what the user typed.
 //
 // Steam's new browse page loads results with two request shapes:
@@ -23,6 +23,8 @@
 
     var TERMS_ATTR = 'data-wshs-terms';
     var FETCHED_ATTR = 'data-wshs-fetched';
+    var REQUESTED_TERMS_ATTR = 'data-wshs-requested-terms';
+    var SCOPE_ATTR = 'data-wshs-description-search';
     var originalFetch = window.fetch;
     if (typeof originalFetch !== 'function') return;
 
@@ -51,8 +53,10 @@
         if (type !== 'routeAction' && type !== 'routeData') return null;
         var url = new URL(input instanceof Request ? input.url : String(input), window.location.href);
         if (!/\/workshop\/browse\/?$/.test(url.pathname)) return null;
-
         url.searchParams.set('searchtext', withTerms(url.searchParams.get('searchtext'), terms));
+        // Steam's native targets: 1 = titles only; 0 = titles + descriptions.
+        var target = document.documentElement.getAttribute(SCOPE_ATTR) === '1' ? 0 : 1;
+        url.searchParams.set('search_text_target', String(target));
         var nextInit = init;
         if (init && typeof init.body === 'string' && init.body.indexOf('"search_text"') !== -1) {
             var body = JSON.parse(init.body);
@@ -60,6 +64,7 @@
             for (var i = 0; i < args.length; i++) {
                 if (args[i] && typeof args[i].search_text === 'string') {
                     args[i].search_text = withTerms(args[i].search_text, terms);
+                    args[i].search_text_target = target;
                 }
             }
             nextInit = Object.assign({}, init, { body: JSON.stringify(body) });
@@ -77,6 +82,10 @@
             next = null;
         }
         if (!next) return originalFetch.apply(this, arguments);
+        if (next.isAction) {
+            document.documentElement.setAttribute(REQUESTED_TERMS_ATTR, getTerms());
+            document.documentElement.setAttribute('data-wshs-requested-description-search', document.documentElement.getAttribute(SCOPE_ATTR) || '0');
+        }
         var pending = originalFetch.call(this, next.input, next.init);
         if (next.isAction) {
             pending.then(function () {

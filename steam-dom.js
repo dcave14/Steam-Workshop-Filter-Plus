@@ -320,6 +320,10 @@
     // from a page-level wrapper (single-card pages), so null is returned and nothing is
     // hidden. The final root is re-validated against the same rule; fail safe.
     function findCardRoot(link) {
+        // Quick View contains linked dependency thumbnails. They are not
+        // browse results and must never affect filtering or grid geometry,
+        // even while a closed dialog remains mounted in React's tree.
+        if (link.closest('dialog, [role="dialog"], [aria-modal="true"]')) return null;
         var id = parsePublishedFileId(link.href);
         if (!id) return null;
         var templateRoot = document.getElementById('CommunityTemplate') ||
@@ -380,7 +384,7 @@
     // cards (still zero after the pass) are skipped. Returns null when no card
     // is measurable. Cards hidden by saved author filters (saved-filters.js,
     // wshs-filtered) get the same treatment.
-    var FILTER_CLASSES = ['hidden-item', 'wshs-filtered'];
+    var FILTER_CLASSES = ['hidden-item', 'wshs-filtered', 'wshs-ratings-filtered'];
 
     function getCardGeometry() {
         var cards = enumerateCards();
@@ -559,6 +563,7 @@
                 return;
             }
             if (typeof value === 'object') {
+                if (value.publishedfileid != null && window.WSHSMetadata) window.WSHSMetadata.seed([value]);
                 if (value.publishedfileid != null && value.star_rating != null) {
                     var stars = Number(value.star_rating);
                     if (!isNaN(stars)) {
@@ -645,6 +650,7 @@
     }
 
     window.WSHSDom = {
+        primeMetadata: function () { if (starFallback === null) starFallback = buildStarFallback(); },
         isNewLayout: isNewLayout,
         getControlArea: getControlArea,
         getSortButton: getSortButton,

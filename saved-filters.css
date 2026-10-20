@@ -4,6 +4,11 @@
    and the [+][-] picker beside card authors and title selections. */
 
 /* Cards hidden by a saved author filter. */
+.wshs-description-option { display:flex; align-items:center; gap:6px; margin-top:8px; color:#b8bfc6; font:12px/1.4 Arial,sans-serif; }
+.wshs-description-option input { margin:0; width:13px; height:13px; flex:none; accent-color:#1a9fff; }
+.wshs-description-status { margin-top:6px; color:#8f98a0; font:12px/1.4 Arial,sans-serif; }
+.wshs-description-retry { margin-top:5px; padding:0; border:0; background:none; color:#67c1f5; cursor:pointer; font:12px Arial,sans-serif; }
+.wshs-description-status[hidden],.wshs-description-retry[hidden] { display:none; }
 .wshs-filtered {
     display: none !important;
 }
@@ -54,6 +59,7 @@
     flex: 1 1 auto;
     min-width: 0;
     box-sizing: border-box;
+    height: 33px;
     padding: 7px 9px;
     border: none;
     border-radius: 2px;
@@ -71,10 +77,148 @@
 
 .wshs-sf-save {
     flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    height: 33px;
+    padding: 0 12px;
+    border: 1px solid #64707d;
+    border-radius: 2px;
+    background: #3b4654;
+    color: #fff;
+    font-family: inherit;
+    font-size: 13px;
+    line-height: normal;
+    cursor: pointer;
 }
 
-/* Card picker: floats in <body> beside the author name or above a title
-   selection, so it never mutates React's card tree or gets clipped by the
+.wshs-sf-save:hover { background: #465363; }
+
+.wshs-sf-help {
+    flex: none;
+    width: 26px;
+    height: 33px;
+    box-sizing: border-box;
+    padding: 0;
+    border: 1px solid #64707d;
+    border-radius: 2px;
+    background: #313843;
+    color: #c4c4c4;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.wshs-sf-help:hover,
+.wshs-sf-help:focus-visible {
+    background: #465363;
+    color: #fff;
+}
+
+.wshs-sf-help-panel {
+    box-sizing: border-box;
+    margin-top: 8px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    color: #acb2b8;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.wshs-sf-help-panel[hidden] {
+    display: none;
+}
+
+.wshs-sf-help-panel p {
+    margin: 0 0 8px;
+}
+
+.wshs-sf-help-panel p:last-child {
+    margin-bottom: 0;
+}
+
+.wshs-picker-word-toggle {
+    display: inline-flex;
+    width: 14px;
+    height: 14px;
+    flex: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    transform: none !important;
+    transition: none;
+    --button-fill: #313843;
+    --button-stroke: #64707d;
+    --button-symbol: #fff;
+    cursor: pointer;
+}
+
+.wshs-picker-word-toggle[aria-checked="true"] {
+    --button-fill: #1a9fff;
+    --button-stroke: #1a9fff;
+}
+
+.wshs-picker-word-toggle svg { display: block; width: 14px; height: 14px; flex: none; }
+
+dialog[open] .wshs-qv-creators {
+    flex-wrap: wrap;
+    align-items: center;
+    align-content: flex-start;
+    overflow: visible;
+    white-space: normal;
+}
+
+dialog[open] .wshs-qv-creators > * {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    white-space: nowrap;
+}
+
+dialog[open] .wshs-qv-creators > span {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+dialog[open] .wshs-qv-creators > span > span {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+}
+
+dialog[open] .wshs-qv-creators a {
+    display: inline-block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.wshs-qv-author-active {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    max-width: 100%;
+    padding-right: 76px;
+}
+
+.wshs-qv-author-active > a {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Card picker: floats in <body> beside the author name or over the preview
+   for a title selection, so it never mutates React's card tree or gets clipped by the
    title's ellipsis. */
 .wshs-picker {
     position: absolute;
@@ -90,6 +234,14 @@
     display: inline-flex;
     width: 14px;
     height: 14px;
+    flex: none;
+    box-sizing: border-box;
+    padding: 0;
+    border: 0;
+    background: none;
+    margin: 0;
+    transform: none !important;
+    transition: none;
     cursor: pointer;
     --button-fill: #fff3;
     --button-stroke: transparent;
@@ -115,9 +267,180 @@
     white-space: nowrap;
 }
 
-/* Title links: a drag selects text (for the keyword picker) instead of
-   dragging the link. Firefox gets draggable="false" from saved-filters.js. */
-#CommunityTemplate a[href*="sharedfiles/filedetails/?id="]:not(:has(img)) {
-    -webkit-user-drag: none;
-    user-select: text;
+.wshs-picker-help {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 14px;
+    height: 14px;
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
+    transform: none !important;
+    transition: none;
+    border: 1px solid #64707d;
+    border-radius: 2px;
+    background: #313843;
+    color: #c4c4c4;
+    font: 600 11px/1 Arial, sans-serif;
+    cursor: pointer;
 }
+
+.wshs-picker-help:hover { background: #465363; color: #fff; }
+
+.wshs-picker-help svg { display: block; width: 12px; height: 12px; flex: none; }
+
+.wshs-picker-guide {
+    position: absolute;
+    box-sizing: border-box;
+    padding: 8px;
+    background: #161d26;
+    box-shadow: 1px 1px 8px #0009;
+    color: #c4c4c4;
+    font-size: 12px;
+    line-height: 1.4;
+    text-align: center;
+    white-space: pre-line;
+    cursor: default;
+}
+
+.wshs-picker-title {
+    padding: 4px;
+    border-radius: 2px;
+    background: rgba(14, 18, 24, 0.96);
+}
+
+/* Keep the native action buttons centered on the author line. Author names
+   ellipsize before the reserved action/picker space, including long names. */
+.wshs-card-author {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    box-sizing: border-box;
+    padding-right: calc(var(--wshs-actions-width, 24px) + 6px);
+}
+
+.wshs-card-author > a {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wshs-card-author.wshs-picker-author-active {
+    padding-right: calc(var(--wshs-actions-width, 24px) + 6px + var(--wshs-picker-width, 50px) + 8px);
+}
+
+.wshs-card-actions {
+    right: 10px !important;
+    bottom: var(--wshs-author-center, 20px) !important;
+    transform: translateY(50%);
+    align-items: center !important;
+}
+
+.wshs-card-author.wshs-picker-author-active ~ .wshs-card-actions {
+    opacity: 1;
+}
+
+.wshs-card-actions [role="button"],
+.wshs-card-actions button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 24px;
+    height: 24px;
+    padding: 2px;
+}
+
+.wshs-card-actions svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* Confirmation belongs inside the original card, with its own background.
+   It must fit even a narrow card and never overlap a replacement title. */
+.wshs-picker-confirmation {
+    box-sizing: border-box;
+    padding: 4px 6px;
+    background: rgba(14, 18, 24, 0.97);
+    box-shadow: 1px 1px 8px rgba(0, 0, 0, 0.6);
+}
+
+.wshs-picker-confirmation .wshs-sq {
+    flex: none;
+}
+
+.wshs-picker-confirmation .wshs-picker-hint {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+    white-space: normal;
+    cursor: pointer;
+}
+
+/* The opt-in mode makes words visibly clickable and keeps links from opening. */
+.wshs-title-selection #CommunityTemplate a[href*="sharedfiles/filedetails/?id="]:not(:has(img)),
+.wshs-title-selection .wshs-qv-title {
+    -webkit-user-drag: none;
+    user-select: none;
+    color: inherit !important;
+    text-decoration: none !important;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+::highlight(wshs-hover-word),
+::highlight(wshs-selected-word) {
+    color: #e6c451;
+    text-decoration: underline;
+    text-decoration-color: #e6c451;
+    text-decoration-thickness: 1px;
+}
+
+/* Classic collection rows retain Steam's native layout and typography. */
+.wshs-collection-filters {
+    box-sizing: border-box;
+    padding: 10px;
+    margin: 0 0 2px;
+    background: rgba(0, 0, 0, .3);
+    font: 13px/1.4 Arial, sans-serif;
+    color: #8f98a0;
+    clear: both;
+}
+.wshs-collection-filters .wshs-sf-heading { color: #acb2b8; }
+.wshs-collection-filters .wshs-sf-add { margin-top: 6px; }
+.wshs-collection-filters .wshs-sf-input { background: #0e151d; }
+.wshs-collection-filters .wshs-sf-input,
+.wshs-collection-filters .wshs-sf-save,
+.wshs-collection-filters .wshs-sf-help { height: 30px; }
+.wshs-collection-filters .wshs-sf-list { flex-direction: row; flex-wrap: wrap; margin-top: 8px; }
+.wshs-collection-filters .wshs-sf-list:empty { margin: 0; }
+.wshs-sf-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 4px 6px; box-sizing: border-box; background: #101922; }
+.wshs-collection-page .workshopItemAuthorName { display: inline-flex; align-items: center; vertical-align: bottom; box-sizing: border-box; max-width: calc(100% - 72px); }
+.wshs-collection-page .workshopItemAuthorName > a { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wshs-collection-author-active { padding-right: calc(var(--wshs-picker-width, 54px) + 4px); }
+.wshs-collection-picker { gap: 2px; font-family: Arial, sans-serif; }
+/* Steam's classic mouseout handler calls Prototype .up() on relatedTarget.
+   Keep hit targets on HTML buttons, whose wrappers support that method. */
+.wshs-collection-picker svg,
+.wshs-collection-filters svg { pointer-events: none; }
+.wshs-collection-picker .wshs-sq,
+.wshs-collection-picker .wshs-picker-word-toggle,
+.wshs-collection-picker .wshs-picker-help,
+.wshs-collection-picker .wshs-sq svg,
+.wshs-collection-picker .wshs-picker-word-toggle svg,
+.wshs-collection-picker .wshs-picker-help svg { width: var(--wshs-inline-size, 12px); height: var(--wshs-inline-size, 12px); }
+.wshs-title-selection .collectionItemDetails > a:has(.workshopItemTitle) { -webkit-user-drag: none; user-select: none; text-decoration: none !important; cursor: pointer; }
+.wshs-title-selection .collectionItemDetails > a .workshopItemTitle { text-decoration: none !important; }
+.wshs-collection-summary { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.wshs-collection-count { white-space: nowrap; }
+.wshs-collection-sizes { margin-left: auto; min-height: 2.8em; color: #8f98a0; font: 12px/1.4 Arial, sans-serif; text-align: right; text-transform: none; }
+.wshs-size-retry { padding: 0; border: 0; background: none; color: #67c1f5; font: inherit; cursor: pointer; }
+.wshs-size-retry[hidden] { display: none; }
+.wshs-ratings-filtered { display: none !important; }

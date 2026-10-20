@@ -2,6 +2,165 @@
 
 How this project is tested.
 
+Performance follow-up (October 20): bounded, sequential samples in
+`perf/runtime-perf.js` and the before-source snapshot show collection hover scripting
+55.65 → 3.25 ms (94% less), star-filter scripting 213.92 → 38.73 ms (82% less), and
+filter/reset total main-thread work 467.14 → 334.97 ms (28% less). These are averages
+of two short samples each, not whole-PC CPU or network speed claims. See `perf/REPORT.md`.
+The harness defaults to one run per page, caps repeats at two, lowers browser priority,
+checks free memory/page heap, and skips further interactions if idle load exceeds budget.
+No CPU throttling, stress loops, or heap snapshots. A 2.5-second DevTools MCP idle trace
+and ten live full-description/filter/size checks were recorded. Styling is unchanged.
+Regression follow-up: collection filters 29, size/ratings 25 (including cached ID changes),
+Workshop ratings 21, geometry 70, saved filters 57, and Quick View 35 passed in Chrome.
+Six UI-only collection motion checks passed in Firefox, including sleeping controls waking
+for scroll/resize, a 650ms transform (maximum sampled offset 0.067px), and target filtering.
+Quick View navigation waits for the new item and parks the pointer away from creators so
+a legitimate new hover does not get mistaken for stale controls.
+
+1.4.0 verification: Chrome 57/57 and Firefox 57/57 saved-filter checks (including three
+consecutive reloads each); 35 Quick View filter checks in each browser; 78 inflection
+checks; 7 live plural/highlight checks; 13 word-mode dismissal checks; 30 picker layout
+checks; 54 geometry checks; 7 migration/concurrency/cache/search
+regressions. Final runs passed without extension or hydration errors. Both release ZIPs
+were checked against the current manifest and all referenced source bytes.
+Collection follow-up: 27 live collection checks, 21 intercepted subscription checks in
+each of Chrome and Firefox, and 8 Chrome DevTools MCP checks passed. Workshop 57/57,
+Quick View 35/35, and geometry 54/54 were rerun successfully. Both final ZIPs contain
+14 files matching current source. No real subscription changes were made during tests.
+Size/ratings follow-up: 24 collection byte/units/filter/cache/retry/layout checks and
+21 Workshop rating-count/responsive/unknown-count checks passed in both Chrome and
+Firefox. The expanded four-control geometry matrix has 70 checks. Nine DevTools MCP
+checks validate live Steam sizes, their change after exclusions, rating thresholds,
+and the two-by-three toolbar with centered labels and left-pinned icons in both rows.
+Release packages now contain 16 files. Historical three-control measurements below
+describe earlier versions, not the current layout.
+
+Search-scope/order follow-up: `node tests/filter-search-scope-test.js` (also `--firefox`)
+covers exact button order/centering, newest-first versions, the separate description toggle,
+both keyword modes, full descriptions beyond row previews, tab synchronization, reloads,
+missing descriptions, retry, and subscription-plan verification. Ten live DevTools MCP checks
+also read real descriptions for the 862-item collection, including detail-page fallback for
+six descriptions omitted by Steam's public API. Packages now contain 17 files.
+Chrome's native whitespace-search reload warning (React #418) was reproduced with no
+extension using `tests/steam-whitespace-reload-baseline.js`; the test separately verifies recovery,
+the saved preference, and the correct scope afterward. Only that reload warning and the
+previously reproduced Firefox native WASM CSP warning are separated from extension errors.
+
+## Saved filters and Quick View regressions
+
+Install Puppeteer with `cd perf; npm install`, then run from the repository root:
+
+```
+node tests/saved-filters-test.js
+node tests/saved-filters-regression-test.js
+node tests/workshop-geometry-test.js
+node tests/picker-layout-test.js
+node tests/quick-view-filters-test.js
+node tests/title-word-inflection-test.js
+node tests/title-word-ui-test.js
+node tests/word-mode-dismiss-test.js
+node tests/collection-filters-test.js
+node tests/collection-subscriptions-test.js
+node tests/collection-subscriptions-test.js --firefox
+node tests/collection-size-ratings-test.js
+node tests/collection-picker-motion-test.js
+node tests/collection-picker-motion-test.js --firefox
+node tests/workshop-ratings-test.js
+node tests/filter-search-scope-test.js
+node tests/filter-search-scope-test.js --firefox
+node build.js
+node tests/collection-size-ratings-test.js --firefox
+node tests/workshop-ratings-test.js --firefox
+node tests/saved-filters-test.js --firefox
+node tests/quick-view-filters-test.js --firefox
+```
+
+The first test covers the live keyword/author controls, persistence, and clickable title words.
+Collection checks cover the native-style panel, text-sized inline creator controls, title-word
+selection, unchanged row/star geometry, title-only local matches, deferred undo, shared storage
+and live synchronization with Workshop, reloads, and numeric/vanity creator identities.
+Subscription tests intercept every mutation request before it reaches Steam. They exercise
+the exclusion warning, native Add/Overwrite choices, second overwrite confirmation, eligible
+IDs only, existing subscriptions, complete paginated list verification, add-before-remove
+ordering, all-excluded collections, changing filters, failed additions, and unreadable lists.
+The test browser remains logged out: actual signed-in subscription mutations are not claimed
+as verified. Steam's public `sharedfiles_functions_logged_in.js` was inspected to retain the
+native choice/helper contract and per-item POST parameters.
+The picker layout test covers 1600/1280/1024px with short, long, and 200-character creator
+names. It checks the compact +/−/? controls leave Quick View clear, all author-row controls
+share a vertical center, the help fits inside the card, and title controls avoid the stars.
+The main test also checks equal input/Save/help heights and the card question mark's guide.
+Quick View tests use real top-layer dialogs in Chrome and Firefox. They cover each creator's
+controls, co-creator matching, primary-author vanity/profile aliases across reloads, clicked
+title words and title-only requests, help, deferred application/undo, closing while pending,
+and next-mod navigation. The compact word checkbox sits immediately after minus, with its
+explanation in ?. There is no separate sidebar/dialog checkbox row. Tests check yellow
+underlined titles, persistent word targets, switching words, and restoring links on disable.
+Only the hovered creator reserves inline control space; one extra wrap line is reserved
+below the compact names to keep subsequent content steady. The test waits for fonts and the primary preview
+before comparing content positions. Only hovered/selected word ranges use the CSS Highlight
+API; titles are never wrapped or rewritten. Tests inspect range contents and styles, including
+the absence of full-title underlining. English inflection tests cover -s/-es/-ies, irregulars,
+mass nouns, proper-name exceptions, case, possessives, and non-English text. A live Steam
+Workbench/Workbenches test checks the singular saved term still returns plural title matches.
+The dismissal test checks outside-card clicks and Escape clear both word highlights,
+uncheck the toggle, hide pinned controls, and cancel an unconfirmed word filter without
+changing saved filters. It also checks clicks inside mods/help retain the mode and Quick
+View's cross, backdrop, and native Escape close exit it.
+The ? is an SVG icon whose center is compared with
+the +/- SVGs through hover changes. The
+picker lives inside the dialog so it can be clicked above the modal backdrop. Quick View
+dependency images remain excluded from browse-card enumeration. Chrome DevTools MCP
+also checked modal hit testing, the shared word mode, the compact guide, and title undo.
+Card +/− actions wait 2.5 seconds before saving/applying; checks verify the original card
+stays visible past two seconds, confirmation fits inside it, undo cancels the action,
+and the message never transfers to the replacement card. Both author actions and title
+undo are covered. Word mode starts off, uses the checkbox beside minus, and restores
+normal link behavior when disabled. Chrome DevTools MCP also verified the delay and
+containment with an intentionally long title in a real unpacked extension at 1280px.
+Keyword references use Steam's native Title Only scope (`search_text_target=1`); checks
+also inspect visible titles and the help button's placement, explanation, and Escape close.
+The regression test checks that both URL and request-body searches keep saved keywords
+in the title-only scope instead of matching descriptions or tags.
+It samples author and title pickers on every animation frame while the card returns from
+hover, checking that they follow the live link/range within 0.75px through the hide delay.
+The regression test checks migration from `savedFilters[appid]` to independent
+`savedFilters:<appid>` storage keys, empty-list tombstones, simultaneous saves in different
+games, same-game tab synchronization, multiple author includes, and the old `-"armor"` /
+`"mechs"` cache collision. Keyword cache suffixes are now allocated uniquely per page.
+It also checks that multiple saved keywords combine with a typed search. Initial form
+submission waits one task for React's controlled input to commit; the Firefox test covers
+the saved-keyword reload case that previously submitted the old empty value.
+Both browsers repeat that reload three times. The sidebar waits for
+`data-wshs-page-hydrated` (Steam's `SSR.hydrated` flag plus hydrated native sidebar
+click handlers, with no dehydrated ancestor boundary, checked in the MAIN world);
+the sort row's earlier `data-wshs-hydrated` signal is insufficient for sidebar writes.
+Saved terms are also withheld from the fetch hook until this gate passes: changing
+Steam's initial `routeData` during hydration makes the loader disagree with the SSR HTML.
+A load-plus-quiet-DOM fallback handles pages where the full signal is unavailable.
+The initial saved query is acknowledged by the MAIN-world hook through
+`data-wshs-requested-terms`. A bounded retry with a fresh cache suffix handles
+Steam resetting the controlled input after its root reports hydration complete.
+
+The geometry test opens Quick View (including dependency thumbnails), closes it three times
+with the cross or Escape, and compares all control rects and gaps without hovering a card.
+It also sweeps star/hide/sort states at 1600/1280 and the two-button fallback at 640/520,
+and checks an all-hidden grid. Dialog content (`dialog`, `role=dialog`, `aria-modal=true`)
+is excluded from browse-card enumeration and grid-author filtering. Modal picker targets
+are explicitly limited to Quick View's main heading and its creator row, excluding dependencies.
+These tests use real unpacked extensions in temporary browser profiles. Screenshots go to
+`tests/out/`. Chromium executables can be overridden (`--chrome` on the first test, the
+first positional argument on the regression/matrix tests). The Firefox test uses the built
+Firefox manifest; rebuild before running it.
+
+Steam sometimes responds HTTP 200 with `eresult:10` and an overloaded query queue. That
+is a service failure, not a valid empty result. Reference queries retry briefly and then fail
+explicitly; do not claim acceptance from those error pages. Logged-in subscription checks
+still require a Steam login; logged-out hide toggles cannot verify subscription lookup.
+The Firefox test also loads Steam once without any extension. Its own WebAssembly CSP
+errors are excluded only when reproduced in that baseline; other page/hydration errors fail.
+
 ## Performance testing
 
 `perf/perf-test.js` loads live Steam pages in headless Chrome (Puppeteer, system Chrome) and
@@ -71,6 +230,13 @@ checks; it is not acceptance.
   `C:\Users\prodb\AppData\Local\Temp\opencode\ws-rim-browse.html`. Never commit captures.
 
 ## Filter variation matrix (standing runtime check)
+
+Current toolbar: four controls, including minimum rating count. The updated matrix samples
+all four, includes rating thresholds 0/100/1000/5000, and verifies 1600/1280/640/520px.
+Wide four-column grids align one dropdown with each card; narrower grids use equal columns.
+The native sort remains the last control. Collection pages use a CSS grid with two rows of
+three equal controls. The older three-control/fallback measurements below are historical;
+their card-width and cleared-sort-width details are superseded by this four-control layout.
 
 Every runtime round must re-run the filter variation matrix: capture all three control rects
 (x/y/w/h), the two gaps and the computed font-size as a baseline, then sweep every sort option,

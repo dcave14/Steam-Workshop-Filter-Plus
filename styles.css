@@ -1,5 +1,34 @@
 /* styles.css */
 
+/* Four Workshop dropdowns; compact icon spacing keeps labels readable. */
+.wshs-four-filter-controls .hide-subscribed-button { position:relative; padding-left:28px; padding-right:28px; }
+.wshs-four-filter-controls .wshs-left-icon { position:absolute; left:8px; top:50%; transform:translateY(-50%); }
+.wshs-four-filter-controls .wshs-chevron,
+.wshs-four-filter-controls .wshs-toggle-slot { position:absolute; right:8px; top:50%; transform:translateY(-50%); }
+.wshs-four-filter-controls .wshs-left-icon { width: 20px; height: 20px; flex: 0 0 20px; }
+.wshs-four-filter-controls .wshs-chevron,
+.wshs-four-filter-controls .wshs-toggle-slot { width: 12px; flex: 0 0 12px; }
+.wshs-ratings-control { min-width: 0; }
+.wshs-ratings-menu { width: 100%; box-sizing: border-box; }
+.wshs-ratings-status { padding: 8px; color: #8f98a0; font: 11px/1.4 Arial, sans-serif; white-space: normal; }
+.wshs-ratings-retry { border: 0; background: none; padding: 8px; color: #67c1f5; font: 12px Arial, sans-serif; cursor: pointer; }
+.wshs-ratings-retry[hidden] { display: none; }
+
+/* Collection: three native actions, then Star / Hide Subscribed / Ratings. */
+.subscribeCollection.wshs-six-controls { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
+.subscribeCollection.wshs-six-controls > .general_btn {
+    width: auto; min-width: 0; margin: 0; height: 30px; box-sizing: border-box;
+    padding: 0 28px; text-align: center; white-space: nowrap;
+}
+.subscribeCollection.wshs-six-controls > div[style*="clear"] { display: none; }
+.subscribeCollection.wshs-six-controls .wshs-collection-controls { display: contents !important; }
+.subscribeCollection.wshs-six-controls .wshs-collection-controls > div,
+.subscribeCollection.wshs-six-controls .wshs-collection-controls > button { min-width: 0; margin: 0; }
+.subscribeCollection.wshs-six-controls .wshs-collection-controls .hide-subscribed-button { width: 100%; margin: 0; padding: 0 28px; }
+.subscribeCollection.wshs-six-controls .wshs-toggle-slot { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
+.subscribeCollection.wshs-six-controls .star-dropdown-content { width: 100%; min-width: 0; box-sizing: border-box; }
+.subscribeCollection.wshs-six-controls svg { pointer-events: none; }
+
 /* Injected controls rebuilt with the chrome of Steam's native new-layout sort
    button: translucent dark, blurred, square corners, one uniform 13px label on
    all three controls (star, hide and the native sort button). */
