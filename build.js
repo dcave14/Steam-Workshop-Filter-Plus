@@ -13,9 +13,10 @@
 //   - strict_min_version 140.0: data_collection_permissions needs Firefox
 //     140+ (Android 142+); everything else used ("world": "MAIN" for
 //     hydration-signal.js, :has(), CSS zoom) works from Firefox 128
-//   - data_collection_permissions: required by AMO for new add-ons; "none"
-//     because nothing is sent to the developer or third parties (the only
-//     request goes to Steam itself, see the privacy policy)
+//   - data_collection_permissions: required by AMO for new add-ons;
+//     "websiteContent" because the public item IDs of mods shown on Workshop
+//     and collection pages go to the shared data service (see the privacy
+//     policy). Nothing else leaves the device except requests to Steam.
 
 const fs = require('fs');
 const path = require('path');
@@ -27,7 +28,7 @@ const DIST = path.join(ROOT, 'dist');
 const GECKO = {
     id: 'steam-workshop-filter-plus@dcave14',
     strict_min_version: '140.0',
-    data_collection_permissions: { required: ['none'] }
+    data_collection_permissions: { required: ['websiteContent'] }
 };
 
 function manifestFiles(manifest) {
