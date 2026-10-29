@@ -94,6 +94,10 @@
             document.documentElement.setAttribute('data-wshs-hydrated', '1');
         }
         var pageReady = !!(window.SSR && window.SSR.hydrated === true && sidebarIsHydrated());
+        var previews = document.querySelectorAll('#CommunityTemplate .aspectratio_16x9 img, #CommunityTemplate .aspectratio_square img');
+        if (window.SSR && window.SSR.hydrated === true && previews.length && Array.prototype.every.call(previews, hasFiber)) {
+            root.setAttribute('data-wshs-previews-ready', '1');
+        }
         if (pageReady) root.setAttribute('data-wshs-page-hydrated', '1');
         if ((!rowReady || !pageReady) && Date.now() - started < MAX_WAIT_MS) {
             setTimeout(check, POLL_MS);

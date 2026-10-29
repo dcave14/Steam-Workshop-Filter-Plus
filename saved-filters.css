@@ -13,6 +13,85 @@
     display: none !important;
 }
 
+.wshs-sf-inspectable { cursor:pointer !important; }
+.wshs-sf-inspectable:hover { color:#67c1f5; }
+.wshs-sf-inspect { flex:none; width:20px; height:20px; padding:2px; border:0; background:none; color:#8f98a0; cursor:pointer; opacity:0; }
+.wshs-sf-inspect svg { width:16px; height:16px; }
+.wshs-sf-row:hover .wshs-sf-inspect, .wshs-sf-row:focus-within .wshs-sf-inspect, .wshs-sf-inspect[aria-pressed="true"] { opacity:1; }
+.wshs-sf-inspect:hover, .wshs-sf-inspect:focus-visible { color:#67c1f5; }
+.wshs-filter-group { min-width:0; padding:7px; border:1px solid #3b4654; border-radius:3px; display:flex; flex-direction:column; gap:5px; }
+.wshs-group-header { display:flex; align-items:center; gap:5px; min-width:0; }
+.wshs-group-members { display:flex; flex-direction:column; gap:5px; min-width:0; }
+.wshs-group-collapse { display:inline-flex; align-items:center; justify-content:center; flex:none; width:18px; height:20px; padding:1px; border:0; border-radius:2px; background:none; color:#8f98a0; cursor:pointer; }
+.wshs-group-collapse svg { width:12px; height:12px; pointer-events:none; }
+.wshs-group-collapse[aria-expanded="true"] svg { transform:rotate(90deg); }
+.wshs-group-collapse:hover, .wshs-group-collapse:focus-visible { color:#67c1f5; background:#16202d; }
+.wshs-group-toggle { flex:none; margin:0; accent-color:#1a9fff; }
+.wshs-group-name { flex:1; width:0; min-width:0; border:1px solid transparent; border-radius:2px; background:transparent; color:#c7d5e0; padding:3px; font:600 12px Arial,sans-serif; }
+.wshs-group-name:hover, .wshs-group-name:focus { border-color:#64707d; background:#16202d; }
+.wshs-group-header:hover .wshs-sf-inspect, .wshs-group-header:focus-within .wshs-sf-inspect { opacity:1; }
+.wshs-group-remove { flex:none; padding:0 3px; border:0; background:none; color:#8f98a0; font:16px Arial,sans-serif; cursor:pointer; }
+.wshs-group-remove:hover { color:#fff; }
+.wshs-group-select { flex:0 1 76px; width:76px; min-width:48px; max-width:30%; border:1px solid #3b4654; border-radius:2px; padding:2px; background:#16202d; color:#acb2b8; font:11px Arial,sans-serif; }
+.wshs-group-disabled .wshs-sf-row { opacity:.55; }
+.wshs-group-empty { color:#8f98a0; font:12px/1.4 Arial,sans-serif; }
+.wshs-saved-filters .wshs-filter-group .wshs-sf-label { font-size:11px; line-height:16px; }
+.wshs-filter-group .wshs-group-name { font-size:11px; }
+.wshs-filter-group .wshs-group-select { font-size:10px; width:64px; flex-basis:64px; }
+.wshs-dependency-note, .wshs-dependency-status, .wshs-review-status { margin-top:6px; color:#8f98a0; font:12px/1.4 Arial,sans-serif; }
+.wshs-dependency-retry, .wshs-review-exit, .wshs-api-settings { margin-top:6px; border:0; padding:0; background:none; color:#67c1f5; font:12px/1.4 Arial,sans-serif; cursor:pointer; text-align:left; }
+.wshs-saved-filters [hidden] { display:none !important; }
+.wshs-reviewing .wshs-review-match { display:revert !important; }
+.wshs-reviewing .wshs-review-omit { display:none !important; }
+.wshs-review-reason { padding:5px; color:#d3ac42; background:#101922; font:12px/1.4 Arial,sans-serif; }
+
+/* Keep collection inspection as a compact row; display:revert above would
+   otherwise replace Steam's flex row with stacked blocks. */
+.wshs-collection-page.wshs-reviewing .collectionItem.wshs-review-match {
+    display:grid !important;
+    grid-template-columns:72px minmax(0,1fr) 32px;
+    align-items:start;
+    gap:10px;
+    box-sizing:border-box;
+    padding:8px;
+    min-height:0;
+    height:auto;
+}
+.wshs-collection-page.wshs-reviewing .collectionItem.wshs-review-match > .workshopItem {
+    width:72px; height:72px; min-height:0; margin:0;
+}
+.wshs-collection-page.wshs-reviewing .collectionItem.wshs-review-match .workshopItemPreviewHolder,
+.wshs-collection-page.wshs-reviewing .collectionItem.wshs-review-match .workshopItemPreviewImage {
+    width:72px; height:72px; min-height:0; object-fit:contain;
+}
+.wshs-collection-page.wshs-reviewing .collectionItem.wshs-review-match > .collectionItemDetails {
+    min-width:0; width:auto; margin:0; display:flex; flex-direction:column; gap:2px;
+}
+.wshs-collection-page.wshs-reviewing .collectionItem.wshs-review-match .collectionItemDetails > a {
+    display:block; min-width:0;
+}
+.wshs-collection-page.wshs-reviewing .collectionItem.wshs-review-match .workshopItemTitle {
+    padding:0; margin:0; font-size:14px; line-height:18px;
+}
+.wshs-collection-page.wshs-reviewing .collectionItem.wshs-review-match .workshopItemAuthor {
+    font-size:12px; line-height:15px;
+}
+.wshs-collection-page.wshs-reviewing .collectionItem.wshs-review-match .fileRating {
+    display:block; align-self:flex-start; width:auto; height:14px; margin:0;
+}
+.wshs-collection-page.wshs-reviewing .collectionItem.wshs-review-match .workshopItemShortDesc {
+    padding:0; margin:0; font-size:12px; line-height:15px;
+}
+.wshs-collection-page.wshs-reviewing .collectionItem.wshs-review-match > .subscriptionControls {
+    width:auto; margin:0; align-self:center;
+}
+.wshs-collection-page.wshs-reviewing .collectionItem.wshs-review-match .wshs-review-reason {
+    padding:0; margin:0; background:none; font-size:11px; line-height:1.3; overflow-wrap:anywhere;
+}
+.wshs-collection-page.wshs-reviewing .collectionItem.wshs-review-match:not(:has(> .workshopItem)) {
+    grid-template-columns:minmax(0,1fr) 32px;
+}
+
 /* Same 5px row pitch as Steam's Categories list. */
 .wshs-sf-list {
     display: flex;
@@ -334,6 +413,21 @@ dialog[open] .wshs-qv-creators a {
     padding-right: calc(var(--wshs-actions-width, 24px) + 6px + var(--wshs-picker-width, 50px) + 8px);
 }
 
+/* Collections browse cards: reserve the controls' width and shorten the name
+   (ellipsis) so the +/- controls stay inside narrow Compact cards. */
+.wshs-collection-browse-card .wshs-picker-author-active {
+    box-sizing: border-box;
+    padding-right: calc(var(--wshs-picker-width, 68px) + 10px);
+}
+.wshs-collection-browse-card .wshs-picker-author-active > a {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: top;
+}
+
 .wshs-card-actions {
     right: 10px !important;
     bottom: var(--wshs-author-center, 20px) !important;
@@ -414,12 +508,11 @@ dialog[open] .wshs-qv-creators a {
     clear: both;
 }
 .wshs-collection-filters .wshs-sf-heading { color: #acb2b8; }
-.wshs-collection-filters .wshs-sf-add { margin-top: 6px; }
 .wshs-collection-filters .wshs-sf-input { background: #0e151d; }
 .wshs-collection-filters .wshs-sf-input,
 .wshs-collection-filters .wshs-sf-save,
 .wshs-collection-filters .wshs-sf-help { height: 30px; }
-.wshs-collection-filters .wshs-sf-list { flex-direction: row; flex-wrap: wrap; margin-top: 8px; }
+.wshs-collection-filters .wshs-sf-list { flex-direction: column; gap:8px; }
 .wshs-collection-filters .wshs-sf-list:empty { margin: 0; }
 .wshs-sf-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 4px 6px; box-sizing: border-box; background: #101922; }
 .wshs-collection-page .workshopItemAuthorName { display: inline-flex; align-items: center; vertical-align: bottom; box-sizing: border-box; max-width: calc(100% - 72px); }
@@ -444,3 +537,124 @@ dialog[open] .wshs-qv-creators a {
 .wshs-size-retry { padding: 0; border: 0; background: none; color: #67c1f5; font: inherit; cursor: pointer; }
 .wshs-size-retry[hidden] { display: none; }
 .wshs-ratings-filtered { display: none !important; }
+
+/* One consistent editing surface for keywords, requirements and groups. */
+.wshs-saved-filters:not(.wshs-collection-filters){display:flex;flex-direction:column;gap:10px!important}
+.wshs-saved-filters .wshs-sf-add{display:grid;grid-template-columns:minmax(0,1fr) 52px 26px;gap:6px;margin:0;align-items:stretch}
+.wshs-saved-filters .wshs-sf-input,.wshs-saved-filters .wshs-sf-save,.wshs-saved-filters .wshs-sf-help{height:30px;min-height:30px;box-sizing:border-box;font-size:12px}
+.wshs-saved-filters .wshs-sf-input{width:100%;padding:5px 7px;border:1px solid #35424f;background:#101821!important;border-radius:2px}
+.wshs-saved-filters .wshs-sf-input:focus{border-color:#67c1f5}
+.wshs-saved-filters .wshs-sf-save{width:52px;padding:0;border-color:#536171;background:#303d4b}
+.wshs-saved-filters .wshs-sf-help{width:26px;padding:0;border-color:#35424f;background:transparent;color:#a5b3c0}
+.wshs-saved-filters .wshs-description-option{margin:0;font-size:11px;gap:6px}
+.wshs-saved-filters .wshs-inspection-tools{display:flex;flex-direction:column;gap:6px}
+.wshs-saved-filters .wshs-api-settings{display:block;margin:0;padding-top:8px;border-top:1px solid #35424f;font-size:11px}
+.wshs-saved-filters .wshs-dependency-note{margin:0;padding:7px;background:#101821;font-size:11px}
+.wshs-saved-filters .wshs-sf-help-panel{margin-top:6px;padding:8px;font-size:11px}
+.wshs-saved-filters .wshs-filter-group{padding:6px;background:#121d28;border-color:#35424f;gap:5px}
+.wshs-saved-filters .wshs-group-header{display:grid;grid-template-columns:18px 18px minmax(0,1fr) 20px 18px;gap:4px;min-height:22px}
+.wshs-saved-filters .wshs-group-name{width:100%;box-sizing:border-box;padding:2px 0;font-size:11px}
+.wshs-saved-filters .wshs-group-header>.wshs-sf-inspect{grid-column:4}
+.wshs-saved-filters .wshs-group-remove{grid-column:5}
+.wshs-saved-filters .wshs-group-toggle{justify-self:center}
+.wshs-saved-filters .wshs-group-members{gap:3px}
+.wshs-saved-filters .wshs-sf-row{display:grid!important;grid-template-columns:18px 18px minmax(0,1fr) 20px 20px 18px;gap:4px!important;align-items:center;min-width:0;min-height:22px;padding:0}
+.wshs-saved-filters .wshs-sf-row>:nth-child(1){grid-column:1}
+.wshs-saved-filters .wshs-sf-row>:nth-child(2){grid-column:2}
+.wshs-saved-filters .wshs-sf-label{grid-column:3;font-size:11px;line-height:16px}
+.wshs-saved-filters .wshs-sf-row>.wshs-sf-inspect{grid-column:4}
+.wshs-saved-filters .wshs-sf-row>.wshs-sf-delete{grid-column:6;text-align:center;padding:0}
+.wshs-saved-filters .wshs-sf-inspect{opacity:.6}
+.wshs-saved-filters .wshs-sf-inspect:hover,.wshs-saved-filters .wshs-sf-inspect:focus-visible,.wshs-saved-filters .wshs-sf-inspect[aria-pressed="true"]{opacity:1}
+.wshs-saved-filters .wshs-sf-row>.wshs-group-select{grid-column:5;appearance:none;min-width:20px;width:20px;max-width:20px;height:20px;padding:0;border:0;border-radius:2px;color:transparent;font-size:11px;cursor:pointer;background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2395a5b5' stroke-width='1.4'%3E%3Cpath d='M2.5 5.5h6l2 2h7v9h-15zM2.5 5.5v-2h6l2 2h7v2'/%3E%3C/svg%3E") center/15px no-repeat}
+.wshs-saved-filters .wshs-group-select option{color:#c7d5e0;background:#16202d}
+.wshs-saved-filters .wshs-group-select:hover,.wshs-saved-filters .wshs-group-select:focus-visible{outline:1px solid #536171;background-color:#233344}
+
+/* One composer for all additions, and a Steam-styled folder popover. */
+.wshs-add-composer{display:flex;flex-direction:column;gap:6px;min-width:0}
+.wshs-saved-filters .wshs-sf-input{font-size:11px;text-align:center}
+.wshs-saved-filters .wshs-sf-save,.wshs-saved-filters .wshs-sf-help{font-size:11px;text-align:center}
+.wshs-saved-filters .wshs-filter-group .wshs-sf-label,.wshs-saved-filters .wshs-sf-label{font-size:10px;line-height:15px;text-align:center}
+.wshs-saved-filters .wshs-group-name{font-size:10px;text-align:center}
+.wshs-saved-filters .wshs-description-option{font-size:10px;justify-content:center}
+.wshs-saved-filters .wshs-review-status,.wshs-saved-filters .wshs-review-exit{font-size:11px;text-align:center;line-height:1.5}
+.wshs-folder-menu{position:fixed;inset:auto;margin:0;padding:5px;width:max-content;min-width:150px;max-width:min(240px,calc(100vw - 16px));max-height:min(260px,calc(100vh - 16px));box-sizing:border-box;overflow:auto;border:1px solid #536171;border-radius:4px;background:#182532;color:#c7d5e0;box-shadow:0 6px 22px #0009;color-scheme:dark}
+.wshs-folder-menu::backdrop{background:transparent}
+.wshs-folder-option{display:block;position:relative;width:100%;min-height:28px;padding:6px 20px;border:0;border-radius:2px;background:transparent;color:#c7d5e0;font:11px/16px Arial,sans-serif;text-align:center;white-space:normal;overflow-wrap:anywhere;cursor:pointer}
+.wshs-folder-option[aria-checked="true"]{background:#253e52;color:#bde6ff}
+.wshs-folder-option[aria-checked="true"]::before{content:'✓';position:absolute;left:6px;color:#67c1f5}
+.wshs-folder-option:hover,.wshs-folder-option:focus-visible{background:#34536b;color:white;outline:0}
+
+/* Workshop uses the native sidebar's type, grey controls and unboxed rows.
+   Classic collections retain their separate panel treatment above. */
+.wshs-workshop-filters.wshs-saved-filters{gap:8px!important}
+.wshs-workshop-filters .wshs-filter-group{padding:0;border:0;border-radius:0;background:transparent;gap:4px}
+.wshs-workshop-filters .wshs-group-header{padding:3px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.wshs-workshop-filters .wshs-group-name{font-family:inherit;font-size:12px;text-align:left;font-weight:500;color:inherit}
+.wshs-workshop-filters.wshs-saved-filters .wshs-sf-label{font-family:inherit;font-size:12px;text-align:left;line-height:17px}
+/* Steam's native trigger classes supply its state styling and chevron. */
+.wshs-workshop-filters .wshs-add-kind{width:100%;text-align:left}
+.wshs-workshop-filters .wshs-add-kind:not(.wshs-native-type){box-sizing:border-box;display:flex;align-items:center;height:36px;padding:0 8px;border:0;border-radius:2px;font:13px/17px Arial,sans-serif;color:#fff;cursor:pointer;background:#3d4450;box-shadow:2px 2px 4px #0000;transition:background-color .2s ease-in-out}
+.wshs-workshop-filters .wshs-add-kind:not(.wshs-native-type):hover{background:#48505e;box-shadow:2px 2px 4px #0008}
+.wshs-type-menu{position:fixed;inset:auto;margin:0;padding:0;box-sizing:border-box;max-height:calc(100vh - 8px);overflow:auto;border:0;border-radius:0;background:var(--color-dull-8,#3d4450);color:#acb2b8;box-shadow:none}
+.wshs-type-menu::backdrop{background:transparent}
+.wshs-type-menu [role=option]{display:block;width:100%;box-sizing:border-box;border:0;border-radius:0;padding:8px 12px;background:transparent;color:#d6d9dc;font-family:inherit;font-size:12px;font-weight:400;line-height:normal;text-align:left;cursor:pointer;outline:0}
+.wshs-type-menu [role=option][aria-selected=true],.wshs-type-menu [role=option]:hover,.wshs-type-menu [role=option]:focus{background:var(--color-dull-9,#48505e)}
+.wshs-workshop-filters .wshs-add-composer{gap:6px}
+.wshs-workshop-filters.wshs-saved-filters .wshs-sf-input{font-family:inherit;font-size:12px;text-align:left;border:0;border-radius:0;background:var(--wshs-native-input,rgba(0,0,0,.53))!important;padding:0 9px}
+.wshs-workshop-filters.wshs-saved-filters .wshs-sf-save,.wshs-workshop-filters.wshs-saved-filters .wshs-sf-help{font-family:inherit;font-size:12px;border:0;border-radius:2px;color:#fff;background:var(--wshs-native-button,#3d4450)}
+.wshs-workshop-filters .wshs-sf-save:hover,.wshs-workshop-filters .wshs-sf-help:hover{filter:brightness(1.15)}
+.wshs-workshop-filters .wshs-sf-input:focus-visible{outline:1px solid #8f98a0;outline-offset:1px}
+.wshs-workshop-filters.wshs-saved-filters .wshs-description-option{font-family:inherit;font-size:12px;justify-content:flex-start;color:inherit}
+.wshs-workshop-filters .wshs-description-option input,.wshs-workshop-filters .wshs-group-toggle{accent-color:#8f98a0}
+.wshs-workshop-filters .wshs-api-settings{font-family:inherit;border:0;padding-top:2px;font-size:12px}
+.wshs-workshop-filters.wshs-saved-filters .wshs-sf-help-panel{font-family:inherit;font-size:12px;text-align:left;background:rgba(0,0,0,.2);box-shadow:none;border:0;padding:8px}
+.wshs-workshop-filters .wshs-sf-help-panel p{margin:0 0 7px}.wshs-workshop-filters .wshs-sf-help-panel p:last-child{margin:0}
+.wshs-workshop-folder{border-color:#4d5460;border-radius:2px;background:#282d35}
+.wshs-workshop-folder .wshs-folder-option{font-family:inherit}
+.wshs-workshop-folder .wshs-folder-option[aria-checked="true"]{background:#3d4450;color:#fff}
+.wshs-workshop-folder .wshs-folder-option:hover,.wshs-workshop-folder .wshs-folder-option:focus-visible{background:#505966;color:#fff}
+.wshs-collection-type{box-sizing:border-box;display:flex;align-items:center;width:100%;height:30px;padding:0 10px;border:0;border-radius:3px;background:#0006;color:#c7d5e0;font:13px "Motiva Sans",Arial,sans-serif;cursor:pointer;box-shadow:1px 1px 10px #0009}
+.wshs-collection-type span{flex:1;text-align:left}
+.wshs-collection-type::after{content:'';width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid currentColor}
+.wshs-collection-type:hover{background:#97c0e3;color:#3c3d3e}
+.wshs-collection-type:focus-visible{outline:2px solid #c7d5e0;outline-offset:2px}
+.wshs-type-menu.wshs-collection-type-menu{background:#16202d;border-radius:3px;box-shadow:1px 1px 10px #0009}
+.wshs-type-menu.wshs-collection-type-menu [role=option]{color:#c7d5e0}
+.wshs-type-menu.wshs-collection-type-menu [role=option]:hover,.wshs-type-menu.wshs-collection-type-menu [role=option]:focus,.wshs-type-menu.wshs-collection-type-menu [role=option][aria-selected=true]{background:#97c0e3;color:#3c3d3e}
+
+/* Collections: full-width filters above one compact editing row. */
+.wshs-collection-filters{display:flex;flex-direction:column;gap:10px;border-top:1px solid #283b49}
+.wshs-collection-filter-heading{display:flex;align-items:baseline;gap:12px;min-height:24px;flex-wrap:wrap}
+.wshs-collection-filter-heading .wshs-sf-heading{margin-right:auto;color:#c7d5e0;font-size:14px}
+.wshs-saved-count{font:12px/20px Arial,sans-serif;white-space:nowrap}
+.wshs-collection-reset{display:none}
+.wshs-collection-filter-heading .wshs-collection-reset{display:inline-flex;align-items:center;width:auto;height:24px;padding:2px 0;gap:0;border:0;border-radius:0;background:none;box-shadow:none;backdrop-filter:none;color:#c7d5e0;font:12px/20px Arial,sans-serif;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+.wshs-collection-filter-heading .wshs-collection-reset:hover{color:#fff;background:none}
+.wshs-collection-filter-heading .wshs-collection-reset:focus-visible{outline:1px solid #67c1f5;outline-offset:3px}
+.wshs-collection-filters .wshs-inspection-tools.wshs-inspection-empty{display:none}
+.wshs-collection-filters .wshs-inspection-tools>*,.wshs-collection-filters .wshs-review-status{margin:0;text-align:left}
+.wshs-collection-filters .wshs-filter-group{width:100%;max-width:100%;box-sizing:border-box;padding:0;gap:0;overflow:hidden}
+.wshs-collection-filters .wshs-group-header{grid-template-columns:18px 18px 20px minmax(0,1fr) 20px 20px 18px;padding:7px 8px;gap:5px}
+.wshs-collection-filters .wshs-group-folder-icon{grid-column:3;width:18px;height:18px;color:#e6c451}
+.wshs-collection-filters .wshs-group-name{grid-column:4;font-size:12px;text-align:left;font-weight:400;background:transparent;border:1px solid transparent;box-shadow:none}
+.wshs-collection-filters .wshs-group-name:hover,.wshs-collection-filters .wshs-group-name:focus{background:#16202d;border-color:#64707d}
+.wshs-collection-filters .wshs-group-header>.wshs-sf-inspect{grid-column:5}
+.wshs-collection-filters .wshs-group-remove{grid-column:7}
+.wshs-collection-filters .wshs-group-members{gap:0}
+.wshs-collection-filters .wshs-sf-row{padding:7px 8px;gap:5px!important;min-height:34px;width:100%;box-sizing:border-box;background:transparent}
+.wshs-collection-filters .wshs-group-members>.wshs-sf-row{border-top:1px solid #283b49;padding-left:33px}
+.wshs-collection-filters .wshs-sf-label,.wshs-collection-filters .wshs-filter-group .wshs-sf-label{font-size:12px;line-height:18px;text-align:left}
+.wshs-collection-filters .wshs-group-empty{padding:6px 8px;border-top:1px solid #283b49}
+.wshs-collection-filters .wshs-add-composer{display:grid;grid-template-columns:128px minmax(0,1fr);gap:6px;align-items:start;margin:0}
+.wshs-collection-filters .wshs-sf-add{grid-template-columns:minmax(0,1fr) 52px 26px 30px}
+.wshs-collection-filters .wshs-sf-help-panel{grid-column:1/-1;margin:0}
+.wshs-collection-filters .wshs-sf-input{text-align:left;font-size:12px}
+.wshs-collection-filters .wshs-api-settings{display:flex;align-items:center;justify-content:center;width:30px;height:30px;margin:0;padding:4px;border:1px solid #35424f;border-radius:2px;color:#a5b3c0;background:transparent}
+.wshs-collection-filters .wshs-api-settings svg{width:19px;height:19px}
+.wshs-collection-filters .wshs-sf-help:hover,.wshs-collection-filters .wshs-api-settings:hover{background:#253e52;color:#fff}
+.wshs-collection-filters .wshs-description-option{justify-content:flex-start;margin:0;font-size:12px}
+@media(max-width:600px){
+    .wshs-collection-filters .wshs-add-composer{grid-template-columns:minmax(0,1fr)}
+    .wshs-collection-filter-heading{gap:8px}
+}

@@ -1,0 +1,32 @@
+:root{color-scheme:dark;font:14px/1.4 Arial,sans-serif;color:#e5e8eb;background:#1b2026}
+body{width:330px;margin:0;padding:16px;box-sizing:border-box}
+header{display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:1px solid #3b4654}
+h1{font-size:18px;line-height:1.25;margin:0;font-weight:600}
+h2{font-size:13px;font-weight:400;margin:12px 0 10px;color:#b8bfc6}
+.pin-row{display:flex;align-items:center;position:relative;cursor:pointer}
+.pin-row+.pin-row{margin-top:6px}
+.pin-row>span:first-child{flex:1}
+.pin-row>input[role="switch"]{position:absolute;right:0;width:40px;height:24px;margin:0;opacity:0;cursor:pointer}
+.switch{width:40px;height:24px;border-radius:20px;background:#465363;pointer-events:none}
+.switch:after{content:"";display:block;margin:3px;width:18px;height:18px;border-radius:50%;background:white}
+.pin-row>input:checked+.switch{background:#1a9fff}
+.pin-row>input:checked+.switch:after{transform:translateX(16px)}
+.pin-row>input:focus-visible+.switch{outline:2px solid #b8e5ff;outline-offset:3px}
+.hint{font-size:12px;color:#aeb7c2;margin:6px 0 16px}
+fieldset{border:0;padding:0;margin:0;display:flex;align-items:center;justify-content:space-between;gap:12px}
+legend{float:left;padding:0}
+.positions{display:flex;position:relative}
+.positions input{position:absolute;opacity:0;width:1px;height:1px}
+.positions label{min-width:55px;padding:5px 8px;text-align:center;border:1px solid #536171;cursor:pointer;background:#252d36}
+.positions label:last-child{border-left:0}
+.positions input:checked+label{background:#174d80;border-color:#1a9fff;color:#fff}
+.positions input:focus-visible+label{outline:2px solid #b8e5ff;outline-offset:2px;z-index:1}
+footer{border-top:1px solid #3b4654;margin-top:14px;padding-top:10px;color:#aeb7c2;font-size:12px}
+.settings-section{border-top:1px solid #3b4654;margin-top:16px}
+.density{width:100%}.density label{flex:1}
+.settings-section .hint{margin:8px 0 0}
+.motion-options{display:flex;flex-direction:column;align-items:stretch;gap:9px;margin-top:12px;font-size:12px;color:#b8bfc6}
+.motion-options label{display:flex;align-items:center;gap:7px;cursor:pointer}
+.motion-options input{margin:0;accent-color:#1a9fff}
+.motion-options:disabled{opacity:.45}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}

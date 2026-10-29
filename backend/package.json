@@ -1,0 +1,17 @@
+{
+  "name": "steam-workshop-data-service",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "vitest run",
+    "check": "wrangler deploy --dry-run",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.4.7",
+    "vitest": "5.0.5",
+    "wrangler": "4.152.0"
+  }
+}

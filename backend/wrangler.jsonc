@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "steam-workshop-data",
+  "account_id": "f3051677daaf183f5a78fb6fd8bfa003",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-25",
+  "workers_dev": true,
+  "vars": { "MAX_UPSTREAM_PER_24H": "50000" },
+  "durable_objects": { "bindings": [{ "name": "STEAM_BUDGET", "class_name": "SteamBudget" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SteamBudget"] }],
+  "ratelimits": [{ "name": "CLIENT_LIMIT", "namespace_id": "108600294100", "simple": { "limit": 30, "period": 60 } }],
+  "observability": { "enabled": true, "head_sampling_rate": 0.1, "traces": { "enabled": true, "head_sampling_rate": 0.1 } }
+}

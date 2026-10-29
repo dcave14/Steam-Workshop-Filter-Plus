@@ -10,6 +10,7 @@ function firefoxExtension(){
  const root=path.resolve(__dirname,'..'),manifest=JSON.parse(fs.readFileSync(path.join(root,'dist/firefox/manifest.json')));
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'wshs-qv-firefox-'));
  const files=new Set([...Object.values(manifest.icons)]);
+ ['steam-api.js','options.html','options.css','options.js','api-config.js','api-data.js'].forEach(f=>files.add(f));
  for(const s of manifest.content_scripts)for(const f of [...(s.js||[]),...(s.css||[])])files.add(f);
  for(const f of files)fs.copyFileSync(path.join(root,f),path.join(dir,f));
  fs.writeFileSync(path.join(dir,'manifest.json'),JSON.stringify(manifest));return dir;
@@ -115,7 +116,8 @@ function check(name,value){assert.ok(value,name);checks++;console.log('PASS '+na
   await hoverAuthor();
   check('hovering a creator does not replace pinned word controls',await page.evaluate(word=>document.querySelector('dialog[open] .wshs-picker').dataset.word===word,chosen.word));
   const nextWord=await clickTitleWord(page,'dialog[open] .wshs-qv-title',1);
-  check('clicking a different word retargets the Quick View picker',nextWord.word!==chosen.word&&await page.evaluate(word=>document.querySelector('dialog[open] .wshs-picker').dataset.word===word,nextWord.word));
+  // The picker shows the filter stem (Mechs -> Mech), so accept a prefix of the clicked word.
+  check('clicking a different word retargets the Quick View picker',nextWord.word!==chosen.word&&await page.evaluate(word=>{const shown=document.querySelector('dialog[open] .wshs-picker').dataset.word.toLowerCase();return !!shown&&word.toLowerCase().startsWith(shown);},nextWord.word));
   for(const selector of ['.wshs-picker-help','.wshs-sq[data-action="only"]','.wshs-picker-help']){
    await page.hover('dialog[open] '+selector);await wait(80);
    check('question icon stays centered during hover '+selector,await page.evaluate(()=>{
@@ -130,7 +132,7 @@ function check(name,value){assert.ok(value,name);checks++;console.log('PASS '+na
   await page.screenshot({path:path.join(__dirname,'out/quick-view-filter-title.png')});
   await page.click('dialog[open] .wshs-picker [data-action="hide"]');await wait(2900);
   check('Quick View title phrase is saved in the sidebar',await rows()===1&&await page.$eval('.wshs-sf-label',e=>!e.textContent.startsWith('By ')));
-  check('Quick View keyword uses title-only Steam requests',await page.evaluate(()=>!!document.documentElement.getAttribute('data-wshs-requested-terms')));
+  check('Quick View exclusions never reach Steam search',await page.evaluate(()=>!document.documentElement.getAttribute('data-wshs-terms')));
   if(await page.$('dialog[open]'))await close();
   await page.click('.wshs-sf-delete');await wait(1000);
   await open();await hoverAuthor();

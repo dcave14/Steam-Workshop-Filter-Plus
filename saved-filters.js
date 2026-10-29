@@ -1,5 +1,5 @@
 // saved-filters.js
-// Shared per-game keyword and author filters for Workshop and collection pages.
+// Shared per-game keyword, author and dependency filters for Workshop/collections.
 //
 // - A "Saved Filters" section in Steam's left sidebar, above Categories, built
 //   from clones of Steam's own section, rows and +/- buttons. "-" hides
@@ -7,15 +7,13 @@
 // - On cards: hovering an author, or clicking an opted-in title word, shows the same
 //   [+][-] pair beside it, which becomes a [check] once one is picked.
 //
-// Keyword filters are applied by Steam's server: search-terms-hook.js (MAIN
-// world) appends them to the search text of Steam's own browse requests, so
-// they match titles (and optionally descriptions) while the search box keeps showing
-// only what the user typed. Steam's text search does not match the author
-// field, so author filters hide cards on the page by the author link instead
-// (wshs-filtered), like the star and subscribed filters do.
+// Saved exclusions use verified title/description text, never Steam's index or
+// comments. Longer + keywords also narrow Steam's search via search-terms-hook.js.
+// All filters are checked locally on loaded cards; collections contain all rows.
 //
 // Filters are stored per game: chrome.storage.local['savedFilters:' + appid] is a
-// list of { kind: 'keyword' | 'author', value, label, state: -1 | 0 | 1 }.
+// list of { kind: 'keyword' | 'author' | 'dependency', value, label, state: -1 | 0 | 1, groupId? }.
+// Optional groups use chrome.storage.local['savedFilterGroups:' + appid].
 
 (function initSavedFilters() {
     'use strict';
@@ -51,10 +49,12 @@
     var appId = readAppId();
     if (!appId) return;
     var storageKey = LEGACY_STORAGE_KEY + ':' + appId;
+    var groupsKey = 'savedFilterGroups:' + appId;
     var descriptionKey = 'savedFilterDescriptions:' + appId;
     var includeDescriptions = false;
 
     var filters = [];
+    var groups = [];
     var knownCreators = new Map(); // creator lists already shown by Quick View, keyed by item id
     var authorAliases = new Map();
     var creatorLayouts = new WeakMap();
@@ -63,9 +63,13 @@
     var picker = null;
     var pickerTarget = null; // { kind, value, label, anchor, range? }
     var pickerPositionFrame = null;
-    var collectionPositionUntil = 0;
+    var pickerViewKey = null;
     var collectionPositionResize = null;
     var collectionPositionMutation = null;
+    var collectionPosition = null;
+    var collectionSizeDirty = true;
+    var collectionMotionDirty = true;
+    var collectionAnimations = [];
     var pickerHideTimer = null;
     var pickerClosing = false; // confirmation runs independently of hovering
     var pickerAuthorRow = null;
@@ -81,6 +85,18 @@
     var retryTimer = null;
     var lastPageMutationAt = Date.now();
     var hoverWordKey = null;
+    var reviewFilter = null;
+    var textMatches = new WeakMap();
+    var cardFilterState = new WeakMap();
+    var openChoiceMenu = null;
+
+    // Edit the existing text node's data. Replacing it (textContent) makes
+    // Chrome recheck Steam's :root:has() rules across the whole page.
+    function setText(node, value) {
+        if (node.textContent === value) return;
+        if (node.firstChild && node.firstChild.nodeType === 3 && !node.firstChild.nextSibling) node.firstChild.nodeValue = value;
+        else node.textContent = value;
+    }
 
     function highlightWord(name, range) {
         if (!window.CSS || !CSS.highlights || typeof Highlight !== 'function') return;
@@ -118,11 +134,37 @@
         return null;
     }
 
+    function findGroup(id) { return groups.find(function (group) { return group.id === id; }); }
+    function filterEnabled(filter) {
+        var group = findGroup(filter.groupId);
+        return !!filter.state && (!group || group.enabled);
+    }
+    function reviewMembers() {
+        if (!reviewFilter) return [];
+        return reviewFilter.kind === 'group' ? activeFilters().filter(function (filter) { return filter.groupId === reviewFilter.value; }) : [reviewFilter];
+    }
+    function syncReview() {
+        if (reviewFilter && reviewFilter.kind === 'group') {
+            var group = findGroup(reviewFilter.value);
+            reviewFilter = group && group.enabled && activeFilters().some(function (f) { return f.groupId === group.id; }) ?
+                { kind: 'group', value: group.id, label: group.name, state: -1 } : null;
+        } else if (reviewFilter) {
+            reviewFilter = findFilter(reviewFilter.kind, reviewFilter.value);
+            if (reviewFilter && !filterEnabled(reviewFilter)) reviewFilter = null;
+        }
+        document.documentElement.classList.toggle('wshs-reviewing', !!reviewFilter);
+    }
+
     function buildTerms(list) {
+        if (reviewFilter) return '';
+        var nativeSearch = getSearchInput();
+        if ((nativeSearch ? nativeSearch.value : new URLSearchParams(location.search).get('searchtext') || '').trim()) return '';
         var terms = [];
         for (var i = 0; i < list.length; i++) {
             var f = list[i];
-            if (f.kind !== 'keyword' || !f.state) continue;
+            // Steam must never decide exclusions from its search index. Check
+            // every minus locally against verified title/description text only.
+            if (!filterEnabled(f) || f.kind !== 'keyword' || f.state !== 1 || window.WSHSMatching.local(f.value)) continue;
             terms.push((f.state < 0 ? '-' : '') + '"' + f.value + '"');
         }
         return terms.join(' ');
@@ -156,12 +198,15 @@
     // would make the old shared-map filters reappear on the next load.
     function save() {
         var snapshot = filters.map(function (f) {
-            return { kind: f.kind, value: f.value, label: f.label, state: f.state };
+            var row = { kind: f.kind, value: f.value, label: f.label, state: f.state };
+            if (findGroup(f.groupId)) row.groupId = f.groupId;
+            return row;
         });
         var update = {};
         update[storageKey] = snapshot;
+        update[groupsKey] = groups.map(function (group) { return { id: group.id, name: group.name, enabled: group.enabled, collapsed: group.collapsed }; });
         chrome.storage.local.set(update);
-        if (collectionPage) { renderRows(); applyAuthorFilters(); }
+        renderRows(); applyAuthorFilters(); scheduleTick();
     }
 
     function setFilter(kind, value, label, state) {
@@ -185,19 +230,31 @@
     function applyStored(list) {
         if (!Array.isArray(list)) list = [];
         filters = list.filter(function (f) {
-            return f && (f.kind === 'keyword' || f.kind === 'author') && typeof f.value === 'string';
+            return f && (f.kind === 'keyword' || f.kind === 'author' || f.kind === 'dependency') && typeof f.value === 'string' &&
+                (f.kind !== 'dependency' || /^\d+$/.test(f.value));
         }).map(function (f) {
-            return { kind: f.kind, value: f.value, label: f.label || f.value, state: f.state === 1 || f.state === -1 ? f.state : 0 };
+            return { kind: f.kind, value: f.value, label: f.label || f.value, state: f.state === 1 || f.state === -1 ? f.state : 0,
+                groupId: findGroup(f.groupId) ? f.groupId : null };
         });
+        syncReview();
         return publishTerms();
     }
 
-    chrome.storage.local.get([storageKey, LEGACY_STORAGE_KEY, descriptionKey], function (data) {
+    function applyGroups(list) {
+        var seen = new Set();
+        groups = (Array.isArray(list) ? list : []).filter(function (group) {
+            if (!group || typeof group.id !== 'string' || !group.id || seen.has(group.id) || typeof group.name !== 'string' || !group.name.trim()) return false;
+            seen.add(group.id); return true;
+        }).map(function (group) { return { id: group.id, name: group.name.trim().slice(0, MAX_PHRASE), enabled: group.enabled !== false, collapsed: group.collapsed === true }; });
+    }
+
+    chrome.storage.local.get([storageKey, groupsKey, LEGACY_STORAGE_KEY, descriptionKey], function (data) {
         // Read old installs without rewriting the shared map. The first edit
         // writes this game's list to its independent key.
         var list = data && data[storageKey];
         if (list === undefined) list = data && data[LEGACY_STORAGE_KEY] && data[LEGACY_STORAGE_KEY][appId];
         includeDescriptions = data && data[descriptionKey] === true;
+        applyGroups(data && data[groupsKey]);
         applyStored(list);
         loaded = true;
         ensureAuthorAliases();
@@ -205,10 +262,11 @@
     });
 
     chrome.storage.onChanged.addListener(function (changes, area) {
-        if (area !== 'local' || (!changes[storageKey] && !changes[descriptionKey])) return;
+        if (area !== 'local' || (!changes[storageKey] && !changes[groupsKey] && !changes[descriptionKey])) return;
         var descriptionChanged = !!changes[descriptionKey] && includeDescriptions !== (changes[descriptionKey].newValue === true);
         if (changes[descriptionKey]) includeDescriptions = changes[descriptionKey].newValue === true;
-        var termsChanged = changes[storageKey] ? applyStored(changes[storageKey].newValue) : publishTerms();
+        if (changes[groupsKey]) applyGroups(changes[groupsKey].newValue);
+        var termsChanged = changes[storageKey] || changes[groupsKey] ? applyStored(changes[storageKey] ? changes[storageKey].newValue : filters) : publishTerms();
         ensureAuthorAliases();
         renderRows();
         renderPicker();
@@ -343,9 +401,9 @@
     }
 
     function ensureAuthorAliases() {
-        var needsAliases = collectionPage || filters.some(function (f) { return f.kind === 'author' && f.state && f.value.indexOf('id/') === 0; });
+        var needsAliases = collectionPage || activeFilters().some(function (f) { return f.kind === 'author' && f.value.indexOf('id/') === 0; });
         if (!needsAliases) return;
-        filters.filter(function (f) { return f.kind === 'author' && f.state; }).forEach(function (filter) {
+        activeFilters().filter(function (f) { return f.kind === 'author'; }).forEach(function (filter) {
             var value = filter.value.toLowerCase();
             if (authorAliases.has(value)) return;
             if (!/^(id|profiles)\/[^/?#]+$/.test(value)) return;
@@ -379,106 +437,176 @@
         return match ? match[1] : null;
     }
 
+    function activeFilters() { return filters.filter(filterEnabled); }
+
+    function filterMatch(filter, root, id) {
+        if (filter.kind === 'dependency') {
+            var required = window.WSHSDependencies.get(id);
+            return required === null ? null : required.indexOf(filter.value) !== -1;
+        }
+        if (filter.kind === 'author') {
+            var keys = Array.prototype.map.call(root.querySelectorAll(collectionPage ? '.workshopItemAuthor ' + AUTHOR_LINK : AUTHOR_LINK), authorKey);
+            var known = knownCreators.get(id);
+            if (known) keys = keys.concat(known.keys);
+            if (!keys.length) return null;
+            return authorValues(filter.value).some(function (key) { return keys.indexOf(key) !== -1; });
+        }
+        var title = collectionPage ? root.querySelector('.workshopItemTitle') : Array.prototype.find.call(root.querySelectorAll(ITEM_LINK), function (a) { return a.textContent.trim(); });
+        var titleText = title ? title.textContent : '';
+        var description = includeDescriptions ? window.WSHSDescriptions.get(id) : '';
+        var cached = textMatches.get(root);
+        if (!cached || cached.title !== titleText || cached.description !== description) {
+            cached = { title: titleText, description: description, matches: new Map() }; textMatches.set(root, cached);
+        }
+        if (cached.matches.has(filter.value)) return cached.matches.get(filter.value);
+        var match = window.WSHSMatching.contains(titleText, filter.value) ? true : description === null ? null : window.WSHSMatching.contains(description, filter.value);
+        if (cached.matches.size >= 100) cached.matches.clear();
+        cached.matches.set(filter.value, match);
+        return match;
+    }
+
+    function passesFilters(root, id, list) {
+        // Multiple + creators include any of them, as on Steam's creator lists.
+        var onlyAuthors = list.filter(function (f) { return f.kind === 'author' && f.state > 0; });
+        if (onlyAuthors.length && onlyAuthors.every(function (f) { return filterMatch(f, root, id) === false; })) return false;
+        return list.every(function (f) {
+            if (f.kind === 'author' && f.state > 0) return true;
+            var match = filterMatch(f, root, id);
+            return match === null || (f.state > 0 ? match : !match);
+        });
+    }
+
+    function prepareLocalData(items, list) {
+        var ids = items.map(function (item) { return item.id; }).filter(Boolean);
+        var descriptions = includeDescriptions && list.some(function (f) { return f.kind === 'keyword'; });
+        if (descriptions) window.WSHSDescriptions.request(ids);
+        var dependencies = list.some(function (f) { return f.kind === 'dependency'; });
+        if (dependencies) window.WSHSDependencies.request(ids);
+        var unknown = ids.filter(function (id) { return dependencies && window.WSHSDependencies.get(id) === null; });
+        var loading = unknown.some(window.WSHSDependencies.pending);
+        var status = section && section.querySelector('.wshs-dependency-status');
+        var retry = section && section.querySelector('.wshs-dependency-retry');
+        var message = unknown.length ? loading ? 'Checking required items… ' + unknown.length + ' remaining.' : unknown.length + ' required-item lists unavailable. Retry to verify.' : '';
+        var apiMessage = dependencies && window.WSHSDependencies.message();
+        if (apiMessage) message = (message ? message + ' ' : '') + apiMessage;
+        if (status) { setText(status, message); status.hidden = !message; }
+        if (retry) retry.hidden = !unknown.length || loading;
+        return unknown;
+    }
+
+    function filterExclusion(filter, root, id) {
+        if (filter.kind === 'author' && filter.state > 0) {
+            var authors = activeFilters().filter(function (f) { return f.kind === 'author' && f.state > 0; });
+            var matches = authors.map(function (f) { return filterMatch(f, root, id); });
+            return matches.indexOf(true) !== -1 ? false : matches.indexOf(null) !== -1 ? null : true;
+        }
+        var match = filterMatch(filter, root, id);
+        return match === null ? null : filter.state < 0 ? match : !match;
+    }
+
+    function reviewExclusion(root, id) {
+        var matches = reviewMembers().map(function (filter) { return filterExclusion(filter, root, id); });
+        return matches.indexOf(true) !== -1 ? true : matches.indexOf(null) !== -1 ? null : false;
+    }
+
+    function exclusionReason(filter) {
+        if (filter.kind === 'author' && filter.state > 0) return 'Does not match any + author filter';
+        var name = filter.kind === 'dependency' ? 'Requires ' + filter.label : filter.kind === 'author' ? 'By ' + filter.label : filter.label;
+        return (filter.state < 0 ? 'Excluded by − ' : 'Does not match + ') + name;
+    }
+
+    function reviewItem(root, id) {
+        var show = reviewFilter && reviewExclusion(root, id) === true;
+        cardFilterState.set(root, {
+            hidden: root.classList.contains('wshs-filtered'),
+            match: !!show,
+            omit: !!reviewFilter && !show
+        });
+        root.classList.toggle('wshs-review-match', !!show);
+        root.classList.toggle('wshs-review-omit', !!reviewFilter && !show);
+        var badge = root.querySelector('.wshs-review-reason');
+        if (show) {
+            if (!badge) { badge = document.createElement('div'); badge.className = 'wshs-review-reason'; }
+            var badgeParent = collectionPage ? root.querySelector('.collectionItemDetails') || root : root;
+            if (badge.parentNode !== badgeParent) badgeParent.appendChild(badge);
+            var reason = reviewMembers().filter(function (filter) { return filterExclusion(filter, root, id) === true; }).map(exclusionReason).join(' · ');
+            setText(badge, reason);
+        } else if (badge) badge.remove();
+        return show ? 1 : 0;
+    }
+
+    function updateReviewStatus(count, items) {
+        var status = section && section.querySelector('.wshs-review-status');
+        if (!status) return;
+        var excluded = items.filter(function (item) { return item.root.classList.contains('wshs-filtered'); }).length;
+        var savedCount = section.querySelector('.wshs-saved-count');
+        if (savedCount) setText(savedCount, excluded + ' mods hidden');
+        status.hidden = !reviewFilter;
+        if (reviewFilter) {
+            var unknown = items.filter(function (item) { return reviewExclusion(item.root, item.id) === null; }).length;
+            var message = count + ' excluded mods' + (collectionPage ? ' in this collection.' : ' on this Workshop page. Use Steam’s paging to inspect more.') +
+                (unknown ? ' ' + unknown + ' still unverified.' : '') + ' Subscribed and rating filters are ignored during inspection.';
+            setText(status, message);
+        } else {
+            var summary = excluded + ' mods hidden by saved filters' + (collectionPage ? ' in this collection.' : ' on this page.');
+            setText(status, summary);
+        }
+    }
+
     function applyAuthorFilters() {
         if (collectionPage) { applyCollectionFilters(); return; }
         if (!window.WSHSDom || !window.WSHSDom.enumerateCards) return;
-        var hidden = new Set();
-        var only = new Set();
-        for (var i = 0; i < filters.length; i++) {
-            var f = filters[i];
-            if (f.kind !== 'author' || !f.state) continue;
-            authorValues(f.value).forEach(function (value) { (f.state < 0 ? hidden : only).add(value); });
-        }
-        if (!hidden.size && !only.size) {
-            var stale = document.querySelectorAll('.wshs-filtered');
-            for (var s = 0; s < stale.length; s++) stale[s].classList.remove('wshs-filtered');
-            return;
-        }
+        var list = activeFilters();
         var cards = window.WSHSDom.enumerateCards();
-        for (var c = 0; c < cards.length; c++) {
-            var link = cards[c].root.querySelector(AUTHOR_LINK);
-            var key = link && authorKey(link);
-            var item = cards[c].root.querySelector(ITEM_LINK);
-            var known = item && knownCreators.get(itemId(item));
-            var keys = known ? new Set(known.keys) : new Set();
-            if (key) keys.add(key);
-            var isHidden = false, isIncluded = false;
-            keys.forEach(function (value) {
-                if (hidden.has(value)) isHidden = true;
-                if (only.has(value)) isIncluded = true;
-            });
-            var hide = keys.size > 0 && (isHidden || (only.size > 0 && !isIncluded));
-            cards[c].root.classList.toggle('wshs-filtered', hide);
-        }
+        var dataFilters = list;
+        prepareLocalData(cards, dataFilters);
+        var count = 0;
+        cards.forEach(function (card) {
+            card.root.classList.toggle('wshs-filtered', !passesFilters(card.root, card.id, list));
+            count += reviewItem(card.root, card.id);
+        });
+        updateReviewStatus(count, cards);
+        updateDescriptionStatus(cards, dataFilters);
     }
 
     function collectionRows() {
         return Array.prototype.slice.call(document.querySelectorAll('.collectionItem'));
     }
 
-    function collectionMatch(row, keywords, authors) {
-        if (!keywords.length && !authors.length) return true;
-        if (authors.length) {
-            var keys = Array.prototype.map.call(row.querySelectorAll('.workshopItemAuthor ' + AUTHOR_LINK), authorKey);
-            function matchesAuthor(f) { return f.keys.some(function (value) { return keys.indexOf(value) !== -1; }); }
-            var includes = authors.filter(function (f) { return f.state === 1; });
-            if (includes.length && !includes.some(matchesAuthor)) return false;
-            if (authors.some(function (f) { return f.state < 0 && matchesAuthor(f); })) return false;
-        }
-        if (!keywords.length) return true;
-        var title = row.querySelector('.workshopItemTitle');
-        var link = row.querySelector('.collectionItemDetails > a');
-        var description = includeDescriptions && link ? window.WSHSDescriptions.get(itemId(link)) : '';
-        var text = ((title ? title.textContent : '') + '\n' + (description || '')).normalize('NFKC').replace(/\s+/g, ' ').toLowerCase();
-        return keywords.every(function (f) {
-            var match = text.indexOf(f.value) !== -1;
-            // Unknown descriptions keep potential matches visible until verified.
-            return f.state > 0 ? match || description === null : !match;
-        });
+    function updateDescriptionStatus(items, list) {
+        var needed = includeDescriptions && list.some(function (f) { return f.kind === 'keyword'; });
+        var unknown = needed ? items.map(function (item) { return item.id; }).filter(function (id) { return id && window.WSHSDescriptions.get(id) === null; }) : [];
+        var status = section && section.querySelector('.wshs-description-status');
+        var retry = section && section.querySelector('.wshs-description-retry');
+        var loading = unknown.some(window.WSHSDescriptions.pending);
+        var message = unknown.length ? loading ? 'Loading full descriptions… Results will update.' : unknown.length + ' descriptions unavailable. Retry to verify.' : '';
+        if (status) { setText(status, message); status.hidden = !message; }
+        if (retry) retry.hidden = !unknown.length || loading;
+        return unknown;
     }
 
     function applyCollectionFilters() {
         ensureAuthorAliases();
-        var rows = collectionRows(), keywords = [], authors = [];
-        filters.forEach(function (f) {
-            if (!f.state) return;
-            if (f.kind === 'keyword') keywords.push({ state: f.state, value: f.value.normalize('NFKC').replace(/\s+/g, ' ').toLowerCase() });
-            else authors.push({ state: f.state, keys: authorValues(f.value) });
+        var list = activeFilters();
+        var items = collectionRows().map(function (row) { var link = row.querySelector('.collectionItemDetails > a'); return { root: row, id: link && itemId(link) }; });
+        var unknownDependencies = prepareLocalData(items, list);
+        var unknownDescriptions = updateDescriptionStatus(items, list);
+        var allowed = [], excluded = [], count = 0;
+        items.forEach(function (item) {
+            var matches = passesFilters(item.root, item.id, list);
+            item.root.classList.toggle('wshs-filtered', !matches);
+            count += reviewItem(item.root, item.id);
+            if (item.id) (matches && !item.root.classList.contains('wshs-design-search-hidden') ? allowed : excluded).push(item.id);
         });
-        var searchDescriptions = includeDescriptions && keywords.length > 0;
-        var unknownDescriptions = [];
-        if (searchDescriptions) {
-            rows.forEach(function (row) {
-                var link = row.querySelector('.collectionItemDetails > a'), id = link && itemId(link);
-                if (id && window.WSHSDescriptions.get(id) === null) unknownDescriptions.push(id);
-            });
-            if (unknownDescriptions.length) window.WSHSDescriptions.request(unknownDescriptions);
-        }
-        var status = section && section.querySelector('.wshs-description-status');
-        var retry = section && section.querySelector('.wshs-description-retry');
-        var loading = unknownDescriptions.some(window.WSHSDescriptions.pending);
-        if (status) {
-            var message = unknownDescriptions.length ? loading ? 'Loading full descriptions… Results will update.' : unknownDescriptions.length + ' descriptions unavailable. Retry before subscribing.' : '';
-            if (status.textContent !== message) status.textContent = message;
-            status.hidden = !message;
-        }
-        if (retry) retry.hidden = !unknownDescriptions.length || loading;
-        var allowed = [], excluded = [];
-        rows.forEach(function (row) {
-            var link = row.querySelector('.collectionItemDetails > a');
-            var id = link && itemId(link);
-            var matches = collectionMatch(row, keywords, authors);
-            row.classList.toggle('wshs-filtered', !matches);
-            if (id) (matches ? allowed : excluded).push(id);
-        });
+        updateReviewStatus(count, items);
         var button = document.querySelector('.subscribeCollection [onclick*="SubscribeCollection("]');
         if (button && loaded) {
-            if (unknownDescriptions.length) {
+            if (unknownDescriptions.length || unknownDependencies.length) {
                 button.removeAttribute('data-wshs-subscription-plan');
-                button.setAttribute('data-wshs-subscription-error', 'Full descriptions are still loading or unavailable. Retry or turn off description search before subscribing.');
+                button.setAttribute('data-wshs-subscription-error', 'Descriptions or required-item lists are still loading or unavailable. Retry or turn off the affected filter before subscribing.');
                 return;
             }
-            var uncertain = filters.some(function (f) {
+            var uncertain = activeFilters().some(function (f) {
                 var alias = f.kind === 'author' && f.state && authorAliases.get(f.value.toLowerCase());
                 return alias && (alias.pending || alias.failed);
             });
@@ -599,14 +727,20 @@
             section = document.createElement('section');
             section.className = 'wshs-saved-filters wshs-collection-filters';
             var head = document.createElement('div');
-            head.className = 'wshs-sf-heading';
-            head.textContent = 'Saved Filters';
+            head.className = 'wshs-collection-filter-heading';
+            var title = document.createElement('span'); title.className = 'wshs-sf-heading'; title.textContent = 'Saved filters';
+            var count = document.createElement('span'); count.className = 'wshs-saved-count'; count.textContent = '0 mods hidden';
+            count.title = 'Mods hidden by saved filters in this collection'; count.setAttribute('role', 'status');
+            head.append(title, count);
             var rows = document.createElement('div');
             rows.className = 'wshs-sf-list';
             section.appendChild(head);
-            section.appendChild(buildAddRow());
-            section.appendChild(buildDescriptionToggle());
+            section.appendChild(buildInspectionTools());
             section.appendChild(rows);
+            var composer = buildAddRow();
+            composer.querySelector('.wshs-sf-add').appendChild(section.querySelector('.wshs-api-settings'));
+            section.appendChild(composer);
+            section.appendChild(buildDescriptionToggle());
             document.querySelector('.subscribeCollection').insertAdjacentElement('afterend', section);
             renderRows();
             return;
@@ -616,6 +750,13 @@
         section = anchor.section.cloneNode(false);
         section.removeAttribute('id');
         section.classList.add('wshs-saved-filters');
+        section.classList.add('wshs-workshop-filters');
+        var nativeField = getSearchInput();
+        var nativeDropdown = anchor.section.parentElement.querySelector('[role="combobox"]');
+        var nativeButton = anchor.section.parentElement.querySelector('button:not(.wshs-sf-save)');
+        if (nativeField) section.style.setProperty('--wshs-native-input', getComputedStyle(nativeField).backgroundColor);
+        if (nativeDropdown) section.style.setProperty('--wshs-native-control', getComputedStyle(nativeDropdown).backgroundColor);
+        if (nativeButton) section.style.setProperty('--wshs-native-button', getComputedStyle(nativeButton).backgroundColor);
         var heading = anchor.heading.cloneNode(true);
         heading.textContent = 'Saved Filters';
         var list = document.createElement('div');
@@ -624,6 +765,8 @@
         section.appendChild(list);
         section.appendChild(buildAddRow());
         section.appendChild(buildDescriptionToggle());
+        section.appendChild(buildInspectionTools());
+        section.appendChild(section.querySelector('.wshs-api-settings'));
         anchor.section.parentElement.insertBefore(section, anchor.section);
         renderRows();
     }
@@ -647,13 +790,32 @@
         }
         paintActive(plus, filter.state === 1 ? 1 : 0);
         paintActive(minus, filter.state === -1 ? -1 : 0);
+        row.classList.add('wshs-sf-row');
         var scope = includeDescriptions ? 'title or description' : 'title';
         plus.title = filter.kind === 'author' ? 'Only show mods by this author' : 'Only show mods with this phrase in the ' + scope;
         minus.title = filter.kind === 'author' ? 'Hide mods by this author' : 'Hide mods with this phrase in the ' + scope;
+        if (filter.kind === 'dependency') {
+            plus.title = 'Only show mods that directly require this Workshop item';
+            minus.title = 'Hide mods that directly require this Workshop item';
+        }
         label.textContent = filter.kind === 'author' ? 'By ' + filter.label : filter.label;
+        if (filter.kind === 'dependency') label.textContent = 'Requires ' + filter.label;
         label.classList.add('wshs-sf-label');
         label.removeAttribute('tabindex');
         label.removeAttribute('role');
+        if (filterEnabled(filter)) {
+            label.setAttribute('role', 'button'); label.tabIndex = 0;
+            label.title = 'Inspect mods excluded by this filter';
+            label.classList.add('wshs-sf-inspectable');
+            row.appendChild(buildInspector(filter));
+            function inspectClick(e) { e.stopPropagation(); setReview(filter); }
+            label.addEventListener('click', inspectClick);
+            label.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inspectClick(e); } });
+        }
+
+        if (groups.length) {
+            row.appendChild(buildGroupMenu(filter, label.textContent));
+        }
 
         var remove = document.createElement('span');
         remove.className = 'wshs-sf-delete';
@@ -673,12 +835,149 @@
 
     function renderRows() {
         if (!section || (!collectionPage && !anchor)) return;
+        closeChoiceMenu(false);
+        var focusedFolder = document.activeElement && document.activeElement.closest('.wshs-group-select');
+        var focusedFilter = focusedFolder && { kind: focusedFolder.dataset.kind, value: focusedFolder.dataset.value };
+        var focusedCollapse = document.activeElement && document.activeElement.closest('.wshs-group-collapse');
+        var focusedGroupId = focusedCollapse && focusedCollapse.closest('.wshs-filter-group').dataset.groupId;
+        syncReview();
+        var exit = section.querySelector('.wshs-review-exit');
+        if (exit) { exit.hidden = !reviewFilter; exit.textContent = reviewFilter ? '← Back to filtered results (' + reviewFilter.label + ')' : ''; }
         var toggle = section.querySelector('.wshs-description-toggle');
         if (toggle) toggle.checked = includeDescriptions;
         var list = section.querySelector('.wshs-sf-list');
         while (list.firstChild) list.removeChild(list.firstChild);
-        for (var i = 0; i < filters.length; i++) list.appendChild(buildRow(filters[i]));
+        filters.filter(function (filter) { return !findGroup(filter.groupId); }).forEach(function (filter) { list.appendChild(buildRow(filter)); });
+        groups.forEach(function (group, index) {
+            var container = document.createElement('div'); container.className = 'wshs-filter-group'; container.dataset.groupId = group.id;
+            container.classList.toggle('wshs-group-disabled', !group.enabled);
+            var header = document.createElement('div'); header.className = 'wshs-group-header';
+            var membersBody = document.createElement('div'); membersBody.className = 'wshs-group-members';
+            membersBody.id = 'wshs-group-members-' + appId + '-' + index; membersBody.hidden = group.collapsed;
+            var collapse = document.createElement('button'); collapse.type = 'button'; collapse.className = 'wshs-group-collapse';
+            collapse.setAttribute('aria-expanded', String(!group.collapsed)); collapse.setAttribute('aria-controls', membersBody.id);
+            collapse.setAttribute('aria-label', (group.collapsed ? 'Expand group ' : 'Collapse group ') + group.name);
+            collapse.title = collapse.getAttribute('aria-label');
+            var chevron = svgEl('svg', { viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': 'true' });
+            chevron.appendChild(svgEl('path', { d: 'M6 3l5 5-5 5', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+            collapse.appendChild(chevron);
+            collapse.addEventListener('click', function () { group.collapsed = !group.collapsed; save(); });
+            var enabled = document.createElement('input'); enabled.type = 'checkbox'; enabled.checked = group.enabled; enabled.className = 'wshs-group-toggle';
+            enabled.setAttribute('aria-label', 'Enable group ' + group.name); enabled.title = 'Enable or disable this group; keep its +/− settings';
+            enabled.addEventListener('change', function () { group.enabled = enabled.checked; save(); });
+            var name = document.createElement('input'); name.type = 'text'; name.className = 'wshs-group-name'; name.value = group.name; name.maxLength = MAX_PHRASE;
+            name.setAttribute('aria-label', 'Group name'); name.title = 'Rename group';
+            name.addEventListener('change', function () { var value = name.value.trim(); if (!value) { name.value = group.name; return; } group.name = value; save(); });
+            name.addEventListener('keydown', function (event) { event.stopPropagation(); if (event.key === 'Enter') { event.preventDefault(); name.blur(); } });
+            header.append(collapse, enabled);
+            if (collectionPage) {
+                var folder = svgEl('svg', { viewBox: '0 0 20 20', 'aria-hidden': 'true', 'class': 'wshs-group-folder-icon' });
+                folder.appendChild(svgEl('path', { d: 'M2 4h6l2 2h8v11H2z', fill: 'currentColor' }));
+                header.appendChild(folder);
+            }
+            header.appendChild(name);
+            var members = filters.filter(function (filter) { return filter.groupId === group.id; });
+            if (group.enabled && members.some(filterEnabled)) header.appendChild(buildInspector({ kind: 'group', value: group.id, label: group.name, state: -1 }));
+            var remove = document.createElement('button'); remove.type = 'button'; remove.className = 'wshs-group-remove'; remove.textContent = '×';
+            remove.title = 'Remove group and keep its filters. Filters in disabled groups stay inactive.';
+            remove.setAttribute('aria-label', 'Remove group ' + group.name);
+            remove.addEventListener('click', function () {
+                members.forEach(function (filter) { filter.groupId = null; if (!group.enabled) filter.state = 0; });
+                groups = groups.filter(function (other) { return other.id !== group.id; }); save();
+            });
+            header.appendChild(remove); container.append(header, membersBody);
+            if (!members.length) { var empty = document.createElement('div'); empty.className = 'wshs-group-empty'; empty.textContent = 'Choose this group from a filter’s group menu.'; membersBody.appendChild(empty); }
+            members.forEach(function (filter) { membersBody.appendChild(buildRow(filter)); });
+            list.appendChild(container);
+        });
+        if (focusedGroupId) {
+            var focusedGroup = Array.prototype.find.call(list.querySelectorAll('.wshs-filter-group'), function (group) { return group.dataset.groupId === focusedGroupId; });
+            if (focusedGroup) focusedGroup.querySelector('.wshs-group-collapse').focus({ preventScroll: true });
+        }
+        if (focusedFilter) {
+            var replacement = Array.prototype.find.call(list.querySelectorAll('.wshs-group-select'), function (button) { return button.dataset.kind === focusedFilter.kind && button.dataset.value === focusedFilter.value; });
+            if (replacement) replacement.focus({ preventScroll: true });
+        }
     }
+
+    function buildInspector(filter) {
+        var inspect = document.createElement('button'); inspect.type = 'button'; inspect.className = 'wshs-sf-inspect';
+        inspect.title = 'Inspect mods excluded by ' + filter.label;
+        inspect.setAttribute('aria-label', 'Inspect exclusions for ' + filter.label);
+        inspect.setAttribute('aria-pressed', String(!!reviewFilter && sameFilter(reviewFilter, filter.kind, filter.value)));
+        var glass = svgEl('svg', { viewBox: '0 0 20 20', fill: 'none', 'aria-hidden': 'true' });
+        glass.appendChild(svgEl('circle', { cx: '8', cy: '8', r: '5', stroke: 'currentColor', 'stroke-width': '2' }));
+        glass.appendChild(svgEl('path', { d: 'M12 12l5 5', stroke: 'currentColor', 'stroke-width': '2' }));
+        inspect.appendChild(glass);
+        inspect.addEventListener('click', function (event) { event.stopPropagation(); setReview(filter); });
+        return inspect;
+    }
+
+    function closeChoiceMenu(focusTrigger) {
+        if (!openChoiceMenu) return;
+        var current = openChoiceMenu; openChoiceMenu = null;
+        current.trigger.setAttribute('aria-expanded', 'false');
+        if (current.menu.matches(':popover-open')) current.menu.hidePopover();
+        current.menu.remove();
+        if (focusTrigger && current.trigger.isConnected) current.trigger.focus({ preventScroll: true });
+    }
+
+    function buildGroupMenu(filter, label) {
+        var trigger = document.createElement('button'); trigger.type = 'button'; trigger.className = 'wshs-group-select';
+        trigger.dataset.kind = filter.kind; trigger.dataset.value = filter.value;
+        trigger.setAttribute('aria-label', 'Group for ' + label);
+        trigger.title = 'Move to group (currently ' + (findGroup(filter.groupId)?.name || 'Ungrouped') + ')';
+        trigger.setAttribute('aria-haspopup', 'menu'); trigger.setAttribute('aria-expanded', 'false');
+        function open(last) {
+            if (openChoiceMenu && openChoiceMenu.trigger === trigger) { closeChoiceMenu(true); return; }
+            closeChoiceMenu(false);
+            var menu = document.createElement('div'); menu.className = 'wshs-folder-menu'; menu.popover = 'auto';
+            if (!collectionPage) { menu.classList.add('wshs-workshop-folder'); menu.style.fontFamily = getComputedStyle(trigger).fontFamily; }
+            menu.id = 'wshs-folder-menu-' + appId; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'Move filter to group');
+            trigger.setAttribute('aria-controls', menu.id);
+            var choices = [{ id: '', name: 'Ungrouped' }].concat(groups);
+            choices.forEach(function (group) {
+                var option = document.createElement('button'); option.type = 'button'; option.className = 'wshs-folder-option';
+                option.textContent = group.name; option.dataset.groupId = group.id; option.title = group.name;
+                option.setAttribute('role', 'menuitemradio'); option.setAttribute('aria-checked', String(group.id === (filter.groupId || '')));
+                option.tabIndex = -1;
+                option.addEventListener('click', function (event) {
+                    event.stopPropagation(); closeChoiceMenu(true); filter.groupId = group.id || null; save();
+                });
+                menu.appendChild(option);
+            });
+            menu.addEventListener('keydown', function (event) {
+                event.stopPropagation();
+                var options = Array.prototype.slice.call(menu.children), index = options.indexOf(document.activeElement);
+                if (event.key === 'Escape') { event.preventDefault(); closeChoiceMenu(true); }
+                else if (event.key === 'Tab') closeChoiceMenu(true);
+                else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].indexOf(event.key) !== -1) {
+                    event.preventDefault();
+                    var next = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length;
+                    options[next].focus();
+                }
+            });
+            menu.addEventListener('toggle', function (event) {
+                if (event.newState === 'closed' && openChoiceMenu && openChoiceMenu.menu === menu) closeChoiceMenu(false);
+            });
+            document.body.appendChild(menu); openChoiceMenu = { menu: menu, trigger: trigger }; menu.showPopover();
+            var rect = trigger.getBoundingClientRect(), box = menu.getBoundingClientRect();
+            menu.style.left = Math.max(8, Math.min(innerWidth - box.width - 8, rect.right - box.width)) + 'px';
+            menu.style.top = (rect.bottom + box.height + 6 <= innerHeight ? rect.bottom + 5 : Math.max(8, rect.top - box.height - 5)) + 'px';
+            trigger.setAttribute('aria-expanded', 'true');
+            (last ? menu.lastElementChild : menu.querySelector('[aria-checked="true"]') || menu.firstElementChild).focus();
+        }
+        trigger.addEventListener('click', function (event) { event.stopPropagation(); open(false); });
+        trigger.addEventListener('keydown', function (event) {
+            event.stopPropagation();
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); open(event.key === 'ArrowUp'); }
+        });
+        return trigger;
+    }
+    window.addEventListener('resize', function () { closeChoiceMenu(false); });
+    document.addEventListener('scroll', function (event) {
+        if (openChoiceMenu && !openChoiceMenu.menu.contains(event.target)) closeChoiceMenu(false);
+    }, { capture: true, passive: true });
 
     function buildDescriptionToggle() {
         var container = document.createElement('div');
@@ -686,22 +985,68 @@
         label.className = 'wshs-description-option';
         var input = document.createElement('input');
         input.type = 'checkbox'; input.className = 'wshs-description-toggle'; input.checked = includeDescriptions;
-        var text = document.createElement('span'); text.textContent = 'Include descriptions in search';
+        var text = document.createElement('span'); text.textContent = collectionPage ? 'Search descriptions' : 'Include descriptions in search';
         label.append(input, text);
-        label.title = 'Apply saved + and − phrases to titles and descriptions. Creator filters still match creator names.';
+        label.title = 'Search descriptions for saved keyword filters. Steam’s search box has its own Title / Description settings.';
         input.addEventListener('change', function () {
             var update = {}; update[descriptionKey] = input.checked; chrome.storage.local.set(update);
         });
         container.appendChild(label);
+        var status = document.createElement('div'); status.className = 'wshs-description-status'; status.setAttribute('role', 'status'); status.hidden = true;
+        var retry = document.createElement('button'); retry.type = 'button'; retry.className = 'wshs-description-retry'; retry.textContent = 'Retry descriptions'; retry.hidden = true;
+        retry.addEventListener('click', function () {
+            window.WSHSDescriptions.request(pageItemIds(), true); scheduleTick();
+        });
+        container.append(status, retry);
+        return container;
+    }
+
+    function pageItemIds() {
+        return collectionPage ? collectionRows().map(function (row) { var a = row.querySelector('.collectionItemDetails > a'); return a && itemId(a); }).filter(Boolean) : window.WSHSDom.enumerateCards().map(function (card) { return card.id; });
+    }
+
+    function setReview(filter) {
+        reviewFilter = filter && (!reviewFilter || !sameFilter(reviewFilter, filter.kind, filter.value)) ? filter : null;
+        document.documentElement.classList.toggle('wshs-reviewing', !!reviewFilter);
+        var changed = publishTerms();
+        renderRows(); applyAuthorFilters();
+        if (changed) refetchResults(true);
+    }
+
+    function buildInspectionTools() {
+        var container = document.createElement('div'); container.className = 'wshs-inspection-tools';
+        var status = document.createElement('div'); status.className = 'wshs-dependency-status'; status.setAttribute('role', 'status'); status.hidden = true;
+        var retry = document.createElement('button'); retry.type = 'button'; retry.className = 'wshs-dependency-retry'; retry.textContent = 'Retry required items'; retry.hidden = true;
+        retry.addEventListener('click', function () { window.WSHSDependencies.request(pageItemIds(), true); scheduleTick(); });
+        var exit = document.createElement('button'); exit.type = 'button'; exit.className = 'wshs-review-exit'; exit.hidden = true;
+        exit.addEventListener('click', function () { setReview(null); });
+        var review = document.createElement('div'); review.className = 'wshs-review-status'; review.hidden = true; review.setAttribute('role', 'status');
+        var settings = document.createElement('button'); settings.type = 'button'; settings.className = 'wshs-api-settings'; settings.textContent = 'Data service settings';
         if (collectionPage) {
-            var status = document.createElement('div'); status.className = 'wshs-description-status'; status.setAttribute('role', 'status'); status.hidden = true;
-            var retry = document.createElement('button'); retry.type = 'button'; retry.className = 'wshs-description-retry'; retry.textContent = 'Retry descriptions'; retry.hidden = true;
-            retry.addEventListener('click', function () {
-                var ids = collectionRows().map(function (row) { var a = row.querySelector('.collectionItemDetails > a'); return a && itemId(a); }).filter(Boolean);
-                window.WSHSDescriptions.request(ids, true); scheduleTick();
-            });
-            container.append(status, retry);
+            settings.textContent = '';
+            settings.title = 'Data service settings'; settings.setAttribute('aria-label', settings.title);
+            var gear = svgEl('svg', { viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': 'true' });
+            gear.appendChild(svgEl('path', { d: 'M9 3h6l.5 3 2 1.2 2.8-1 3 5.2-2.3 2 .1 2.3 2.2 2-3 5.2-2.8-1-2 1.1L15 26H9l-.5-3-2-1.1-2.8 1-3-5.2 2.3-2-.1-2.3-2.2-2 3-5.2 2.8 1 2-1.2z', transform: 'translate(2 0) scale(.8)', fill: 'currentColor' }));
+            gear.appendChild(svgEl('circle', { cx: '11.6', cy: '11.6', r: '3', fill: '#101821' }));
+            settings.appendChild(gear);
         }
+        chrome.runtime.sendMessage({ type: 'wshs-api-status' }).then(function (state) {
+            if (state && state.mode !== 'service') {
+                if (collectionPage) { settings.title = 'API key settings'; settings.setAttribute('aria-label', settings.title); }
+                else settings.textContent = 'API key settings';
+            }
+        }).catch(function () {});
+        settings.addEventListener('click', function () { chrome.runtime.sendMessage({ type: 'wshs-open-settings' }); });
+        container.append(settings, status, retry, exit, review);
+        // Collapse the box when every child is hidden. A :has(> :not([hidden]))
+        // rule did this, but it made every element insertion on the page
+        // recheck Steam's :root:has() rules (~60ms on large collections).
+        function syncEmpty() {
+            var empty = !Array.prototype.some.call(container.children, function (child) { return !child.hidden; });
+            if (container.classList.contains('wshs-inspection-empty') !== empty) container.classList.toggle('wshs-inspection-empty', empty);
+        }
+        new MutationObserver(syncEmpty).observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+        syncEmpty();
         return container;
     }
 
@@ -724,14 +1069,15 @@
         var input = document.createElement('input');
         input.type = 'text';
         input.className = 'wshs-sf-input';
-        input.placeholder = 'Add a phrase...';
+        input.placeholder = 'Keyword or phrase…';
+        input.setAttribute('aria-label', 'Keyword or phrase');
         input.maxLength = MAX_PHRASE;
         var bg = searchBoxBackground();
         if (bg) input.style.backgroundColor = bg;
 
         var button = document.createElement('button');
         button.type = 'button';
-        button.textContent = 'Save';
+        button.textContent = 'Add';
         button.classList.add('wshs-sf-save');
 
         var help = document.createElement('button');
@@ -746,12 +1092,12 @@
         panel.hidden = true;
         panel.setAttribute('role', 'note');
         help.setAttribute('aria-controls', panel.id);
-        help.title = '+ shows only matches, − hides matches. Enable description search to check descriptions too. Click for help.';
+        help.title = 'Filter help';
         [
-            'Phrases match mod titles only by default. Enable “Include descriptions in search” to check descriptions too. This applies to both + and −, and is shared with this game’s Workshop and collection pages.',
-            '+ shows only matches. − hides matches. Click an active + or − again to turn that filter off. × deletes it.',
-            'Hover an author for quick + / − filters. The confirmation stays on that mod for 2.5 seconds; click it to undo before the filter takes effect.',
-            'The checkbox beside − lets you click title words. Hovered and chosen words are yellow and underlined. Plurals use their singular form, such as workbenches → workbench. Uncheck to restore normal links. Your filters are saved separately for each game.'
+            'Keywords match whole words in titles. Descriptions are optional; comments are ignored.',
+            '+ Keep matches · − Hide matches · Click again to disable.',
+            'Magnifying glass: inspect hidden mods. ×: delete a filter.',
+            'Groups toggle filters together. Required mods check declared dependencies.'
         ].forEach(function (text) {
             var paragraph = document.createElement('p');
             paragraph.textContent = text;
@@ -772,12 +1118,111 @@
             }
         });
 
-        function submit() {
-            var phrase = cleanPhrase(input.value);
-            if (!phrase) return;
-            setFilter('keyword', phrase, phrase, -1);
-            input.value = '';
+        var kind = 'keyword', drafts = { keyword: '', dependency: '', group: '' };
+        var types = document.createElement('div');
+        types.className = 'wshs-add-kind' + (collectionPage ? ' wshs-collection-type' : '');
+        types.setAttribute('aria-label', 'Add a filter or group');
+        var choices = [['keyword', 'Keyword'], ['dependency', 'Required mod'], ['group', 'Group']];
+        var typeMenu = null, typeLabel = null, closeTypes;
+        function chooseKind(next) {
+            drafts[kind] = input.value; kind = next; input.value = drafts[kind]; input.setCustomValidity('');
+            input.classList.toggle('wshs-dependency-input', kind === 'dependency'); input.classList.toggle('wshs-group-input', kind === 'group');
+            input.maxLength = kind === 'dependency' ? 2048 : MAX_PHRASE;
+            input.placeholder = kind === 'group' ? 'Group name…' : kind === 'dependency' ? 'Workshop URL or ID…' : 'Keyword or phrase…';
+            input.setAttribute('aria-label', kind === 'group' ? 'New filter group name' : kind === 'dependency' ? 'Required Workshop mod URL or ID' : 'Keyword or phrase');
+            input.title = kind === 'dependency' ? 'Checks direct Required Items declared by the creator. Add a keyword filter to catch undeclared references.' : kind === 'group' ? 'Create a group, then assign filters through their folder menus.' : 'Match a literal phrase in titles, with optional descriptions. Steam’s search box handles AND / OR / NOT separately.';
+            button.textContent = kind === 'group' ? 'Create' : 'Add';
+            {
+                typeLabel.textContent = choices.find(function (entry) { return entry[0] === kind; })[1];
+                types.dataset.value = kind;
+                Array.prototype.forEach.call(typeMenu.children, function (item) { item.setAttribute('aria-selected', String(item.dataset.addKind === kind)); });
+            }
+            input.focus();
         }
+        {
+            // Reuse the adjacent Steam control's presentation, including its
+            // state selectors and chevron. Cloning does not copy React handlers.
+            var native = !collectionPage && findCategoryAnchor().section.parentElement.querySelector('[role="combobox"]:not(.wshs-add-kind)');
+            if (native) {
+                types.className += ' wshs-native-type ' + native.className;
+                types.style.cssText = native.style.cssText;
+                Array.prototype.forEach.call(native.children, function (child) { types.appendChild(child.cloneNode(true)); });
+                typeLabel = types.querySelector('span');
+            }
+            if (!typeLabel) { typeLabel = document.createElement('span'); types.appendChild(typeLabel); }
+            typeLabel.textContent = 'Keyword'; types.dataset.value = kind;
+            types.tabIndex = 0; types.setAttribute('role', 'combobox');
+            types.setAttribute('aria-haspopup', 'listbox'); types.setAttribute('aria-expanded', 'false');
+            typeMenu = document.createElement('div'); typeMenu.className = 'wshs-type-menu' + (collectionPage ? ' wshs-collection-type-menu' : '');
+            typeMenu.id = 'wshs-type-menu-' + appId; typeMenu.setAttribute('role', 'listbox');
+            typeMenu.setAttribute('aria-label', 'Filter type'); typeMenu.setAttribute('popover', 'auto');
+            types.setAttribute('aria-controls', typeMenu.id);
+            closeTypes = function (restore) { if (typeMenu.matches(':popover-open')) typeMenu.hidePopover(); if (restore) types.focus(); };
+            function positionTypes() {
+                var rect = types.getBoundingClientRect();
+                if (rect.bottom <= 0 || rect.top >= innerHeight) { closeTypes(false); return; }
+                typeMenu.style.width = rect.width + 'px';
+                typeMenu.style.fontFamily = getComputedStyle(types).fontFamily;
+                typeMenu.style.left = Math.max(4, Math.min(rect.left, innerWidth - rect.width - 4)) + 'px';
+                var height = typeMenu.getBoundingClientRect().height;
+                typeMenu.style.top = (rect.bottom + height <= innerHeight - 4 ? rect.bottom : Math.max(4, rect.top - height)) + 'px';
+            }
+            function openTypes() {
+                typeMenu.showPopover(); positionTypes();
+                types.setAttribute('aria-expanded', 'true');
+                typeMenu.querySelector('[aria-selected="true"]').focus();
+            }
+            var pointerWasOpen = false;
+            types.addEventListener('pointerdown', function () { pointerWasOpen = typeMenu.matches(':popover-open'); });
+            types.addEventListener('click', function (e) { e.stopPropagation(); var closing = pointerWasOpen || typeMenu.matches(':popover-open'); pointerWasOpen = false; if (closing) closeTypes(true); else openTypes(); });
+            types.addEventListener('keydown', function (e) {
+                if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].indexOf(e.key) !== -1) { e.preventDefault(); e.stopPropagation(); openTypes(); }
+            });
+            typeMenu.addEventListener('toggle', function () {
+                var open = typeMenu.matches(':popover-open');
+                types.setAttribute('aria-expanded', String(open));
+                window[open ? 'addEventListener' : 'removeEventListener']('scroll', positionTypes, true);
+                window[open ? 'addEventListener' : 'removeEventListener']('resize', positionTypes);
+            });
+            typeMenu.addEventListener('keydown', function (e) {
+                e.stopPropagation();
+                var items = Array.from(typeMenu.children), index = items.indexOf(document.activeElement);
+                if (e.key === 'Escape') { e.preventDefault(); closeTypes(true); }
+                else if (e.key === 'Tab') closeTypes(false);
+                else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].indexOf(e.key) !== -1) {
+                    e.preventDefault(); items[e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (index + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length].focus();
+                }
+            });
+        }
+        choices.forEach(function (entry) {
+            var item = document.createElement('button'); item.textContent = entry[1]; item.dataset.addKind = entry[0]; item.type = 'button';
+            item.setAttribute('role', 'option'); item.setAttribute('aria-selected', String(kind === entry[0])); item.tabIndex = -1;
+            item.addEventListener('click', function (e) { e.stopPropagation(); closeTypes(false); chooseKind(entry[0]); });
+            typeMenu.appendChild(item);
+        });
+        function submit() {
+            var value = input.value.trim();
+            if (!value) return;
+            if (kind === 'group') {
+                if (groups.some(function (group) { return group.name.toLowerCase() === value.toLowerCase(); })) { input.setCustomValidity('A group with this name already exists.'); input.reportValidity(); return; }
+                groups.push({ id: crypto.randomUUID(), name: value.slice(0, MAX_PHRASE), enabled: true, collapsed: false }); save();
+            } else if (kind === 'dependency') {
+                var id = /^\d+$/.test(value) ? value : null;
+                if (!id) try {
+                    var url = new URL(value);
+                    if (/^(?:https?:)$/.test(url.protocol) && /^(?:www\.)?steamcommunity\.com$/.test(url.hostname) && /^\/(?:sharedfiles|workshop)\/filedetails(?:\/(?:\d+)?)?$/.test(url.pathname)) {
+                        id = url.searchParams.get('id') || /\/(\d+)$/.exec(url.pathname)?.[1];
+                    }
+                } catch (_) {}
+                if (!/^\d+$/.test(id || '')) { input.setCustomValidity('Enter a Steam Workshop item link or numeric ID.'); input.reportValidity(); return; }
+                setFilter('dependency', id, id, -1); window.WSHSDependencies.request([id]);
+            } else {
+                var phrase = cleanPhrase(value); if (!phrase) return;
+                setFilter('keyword', phrase, phrase, -1);
+            }
+            input.value = ''; drafts[kind] = ''; input.setCustomValidity('');
+        }
+        input.addEventListener('input', function () { input.setCustomValidity(''); });
         button.addEventListener('click', function (e) { e.stopPropagation(); submit(); });
         input.addEventListener('keydown', function (e) {
             // Steam's page-level keyboard navigation must not see our typing.
@@ -792,8 +1237,9 @@
         row.appendChild(button);
         row.appendChild(help);
         var container = document.createElement('div');
-        container.appendChild(row);
-        container.appendChild(panel);
+        container.className = 'wshs-add-composer';
+        container.append(types, row, panel);
+        if (typeMenu) container.appendChild(typeMenu);
         return container;
     }
 
@@ -898,7 +1344,7 @@
     // ---------------------------------------------------------------------
 
     function cardOf(el) {
-        if (collectionPage) return el.closest('.collectionItem');
+        if (collectionPage) return el.closest('.collectionItem, .wshs-design-author-row');
         if (el.closest('dialog, [role="dialog"], [aria-modal="true"]')) return null;
         var node = el;
         for (var i = 0; i < 5 && node; i++) {
@@ -920,6 +1366,7 @@
             return picker;
         }
         picker = document.createElement('div');
+        pickerViewKey = null;
         picker.className = 'wshs-picker';
         // Keep focus on the chosen title word while using its controls.
         picker.addEventListener('mousedown', function (e) { e.preventDefault(); e.stopPropagation(); });
@@ -950,6 +1397,10 @@
         if (!picker || !pickerTarget || picker.style.display === 'none') return;
         var current = findFilter(pickerTarget.kind, pickerTarget.value);
         var state = current ? current.state : 0;
+        var viewKey = [state, pendingAction ? pendingAction.state : '', titleSelectionEnabled, pickerHelpOpen, collectionPage].join('|');
+        if (pickerViewKey === viewKey && picker.firstChild) return;
+        pickerViewKey = viewKey;
+        collectionSizeDirty = true;
         while (picker.firstChild) picker.removeChild(picker.firstChild);
         var hint = document.createElement('span');
         hint.className = 'wshs-picker-hint';
@@ -1095,6 +1546,7 @@
             hidePicker();
             return;
         }
+        target.lastRect = rect;
         var box = picker.getBoundingClientRect();
         var cardRect = card.getBoundingClientRect();
         var previewRect = card.querySelector(PREVIEW).getBoundingClientRect();
@@ -1129,34 +1581,59 @@
     }
 
     function positionCollectionPicker(target) {
-        var row = target.anchor.closest('.collectionItem');
-        if (!row || row.matches('.wshs-filtered, .hidden-item, .wshs-ratings-filtered')) { hidePicker(); return; }
-        if (!picker.classList.contains('wshs-collection-picker')) picker.classList.add('wshs-collection-picker');
-        setPickerProperty(picker, '--wshs-inline-size', Math.min(14, parseFloat(getComputedStyle(target.anchor).fontSize)) + 'px');
-        var authorRow = target.kind === 'author' && !pendingAction && target.anchor.parentElement;
-        if (pickerAuthorRow && pickerAuthorRow !== authorRow) releasePickerRow();
-        if (authorRow) {
-            setPickerProperty(authorRow, '--wshs-picker-width', picker.getBoundingClientRect().width + 'px');
-            if (!authorRow.classList.contains('wshs-collection-author-active')) authorRow.classList.add('wshs-collection-author-active');
-            pickerAuthorRow = authorRow;
+        var cachedRow = collectionPosition && collectionPosition.target === target && collectionPosition.row;
+        var row = cachedRow && cachedRow.isConnected && cachedRow.contains(target.anchor) ? cachedRow : target.anchor.closest('.collectionItem, .wshs-design-author-row');
+        if (!row || (row.matches('.wshs-filtered, .hidden-item, .wshs-ratings-filtered') && !row.classList.contains('wshs-review-match'))) { hidePicker(); return; }
+        var rebind = !collectionPosition || collectionPosition.target !== target || collectionPosition.row !== row || collectionPosition.parent !== row.parentElement;
+        if (rebind) {
+            collectionPosition = { target: target, row: row, parent: row.parentElement };
+            collectionSizeDirty = true;
         }
-        picker.classList.toggle('wshs-picker-title', target.kind === 'keyword' && !pendingAction);
-        var rect = target.range ? target.range.getBoundingClientRect() : target.anchor.getBoundingClientRect();
+        var prepared = collectionPosition;
         var bounds = row.getBoundingClientRect();
-        setPickerProperty(picker, 'max-width', Math.max(0, bounds.width - 16) + 'px');
-        var box = picker.getBoundingClientRect();
+        if (collectionSizeDirty || prepared.rowWidth !== bounds.width) {
+            collectionSizeDirty = false;
+            prepared.rowWidth = bounds.width;
+            if (!picker.classList.contains('wshs-collection-picker')) picker.classList.add('wshs-collection-picker');
+            setPickerProperty(picker, '--wshs-inline-size', Math.min(14, parseFloat(getComputedStyle(target.anchor).fontSize)) + 'px');
+            var title = target.kind === 'keyword' && !pendingAction;
+            if (picker.classList.contains('wshs-picker-title') !== title) picker.classList.toggle('wshs-picker-title', title);
+            setPickerProperty(picker, 'max-width', Math.max(0, bounds.width - 16) + 'px');
+            prepared.box = picker.getBoundingClientRect();
+            var authorRow = target.kind === 'author' && !pendingAction && target.anchor.parentElement;
+            if (pickerAuthorRow && pickerAuthorRow !== authorRow) releasePickerRow();
+            if (authorRow) {
+                setPickerProperty(authorRow, '--wshs-picker-width', prepared.box.width + 'px');
+                if (!authorRow.classList.contains('wshs-collection-author-active')) authorRow.classList.add('wshs-collection-author-active');
+                pickerAuthorRow = authorRow;
+            }
+            prepared.guide = picker.querySelector('.wshs-picker-guide');
+            if (prepared.guide) {
+                setPickerProperty(prepared.guide, 'width', Math.min(240, bounds.width - 16) + 'px');
+                setPickerProperty(prepared.guide, 'top', (prepared.box.height + 6) + 'px');
+            }
+        }
+        var rect = target.range ? target.range.getBoundingClientRect() : target.anchor.getBoundingClientRect();
+        if (!rect.width && !rect.height) { hidePicker(); return; }
+        // Inside the scrolling author list, hide the controls while their row is
+        // scrolled out of view. Visibility only, so a pending confirmation survives.
+        if (prepared.clip === undefined) prepared.clip = target.anchor.closest('.wshs-design-author-list');
+        if (prepared.clip) {
+            var clip = prepared.clip.getBoundingClientRect(), middle = rect.top + rect.height / 2;
+            setPickerProperty(picker, 'visibility', middle < clip.top || middle > clip.bottom ? 'hidden' : '');
+        }
+        var box = prepared.box;
         var left = target.kind === 'author' ? rect.right + 4 : rect.left + (rect.width - box.width) / 2;
         var top = target.kind === 'author' ? rect.top + (rect.height - box.height) / 2 : rect.top - box.height - 4;
         if (pendingAction) { left = bounds.right - box.width - 8; top = bounds.bottom - box.height - 5; }
         left = Math.max(bounds.left + 4, Math.min(left, bounds.right - box.width - 4));
         setPickerProperty(picker, 'left', (left + scrollX) + 'px');
         setPickerProperty(picker, 'top', (top + scrollY) + 'px');
-        var guide = picker.querySelector('.wshs-picker-guide');
+        var guide = prepared.guide;
         if (guide) {
-            setPickerProperty(guide, 'width', Math.min(240, bounds.width - 16) + 'px');
             setPickerProperty(guide, 'left', Math.max(bounds.left + 8 - left, Math.min(-80, bounds.right - 248 - left)) + 'px');
-            setPickerProperty(guide, 'top', (box.height + 6) + 'px');
         }
+        if (rebind) watchCollectionPosition();
     }
 
     function positionQuickViewPicker(target) {
@@ -1206,43 +1683,95 @@
         }
     }
 
+    // Workshop cards animate on hover, so the picker follows every frame while
+    // its anchor moves. Once the anchor and picker have held still for
+    // WORKSHOP_STILL_FRAMES frames, tracking sleeps until wakeWorkshopPosition.
+    var WORKSHOP_STILL_FRAMES = 20;
+    var workshopStillFrames = 0, workshopPickerSignature = '';
+    function workshopPickerMoving() {
+        if (!pickerTarget || !picker || picker.style.display === 'none') return false;
+        // Reuse positionPicker's measurement: reading geometry (or scrollX/Y)
+        // after its style writes would force another layout every frame. The
+        // picker's left/top already include the scroll offset.
+        var rect = pickerTarget.lastRect;
+        if (!rect) return true;
+        var signature = [rect.left, rect.top, rect.width, rect.height, picker.style.left, picker.style.top].join('|');
+        workshopStillFrames = signature === workshopPickerSignature ? workshopStillFrames + 1 : 0;
+        workshopPickerSignature = signature;
+        return workshopStillFrames < WORKSHOP_STILL_FRAMES;
+    }
+
+    function wakeWorkshopPosition() {
+        if (collectionPage || !pickerTarget || pickerTarget.quickView || !picker || picker.style.display === 'none') return;
+        workshopStillFrames = 0;
+        if (pickerPositionFrame === null) pickerPositionFrame = requestAnimationFrame(trackPickerPosition);
+    }
+
     function trackPickerPosition() {
         pickerPositionFrame = null;
         positionPicker();
-        if (collectionPage && pickerTarget && performance.now() >= collectionPositionUntil) {
-            var row = pickerTarget.anchor.closest('.collectionItem');
-            if (row && row.getAnimations().some(function (animation) { return animation.playState === 'running'; })) collectionPositionUntil = performance.now() + 400;
+        var moving = pickerTarget?.quickView || (!collectionPage && workshopPickerMoving());
+        if (collectionPage && pickerTarget && !pickerTarget.quickView) {
+            if (collectionMotionDirty && collectionPosition) {
+                collectionMotionDirty = false;
+                var row = collectionPosition.row;
+                collectionAnimations = row.getAnimations({subtree:true});
+                // Ancestor transforms also move the anchor. Discover animations
+                // on wakes, then inspect their cheap state while tracking frames.
+                for (var ancestor = row.parentElement; ancestor; ancestor = ancestor.parentElement) {
+                    collectionAnimations.push.apply(collectionAnimations, ancestor.getAnimations());
+                }
+            }
+            moving = collectionAnimations.some(function (animation) { return animation.playState === 'running' || animation.pending; });
         }
-        // Card hover transforms do not trigger ResizeObserver. Measure each
-        // painted frame, including the leave transition during the hide delay.
-        if (pickerTarget && picker && picker.style.display !== 'none' &&
-            (!collectionPage || pickerTarget.quickView || performance.now() < collectionPositionUntil)) {
+        // Stationary collection and Workshop controls sleep. Real transitions
+        // keep frame tracking; scroll/resize/motion events wake it again.
+        if (pickerTarget && picker && picker.style.display !== 'none' && moving && pickerPositionFrame === null) {
             pickerPositionFrame = requestAnimationFrame(trackPickerPosition);
         }
     }
 
-    function wakeCollectionPosition() {
+    function wakeCollectionPosition(event) {
         if (!collectionPage || !pickerTarget || !picker || picker.style.display === 'none') return;
+        if (event && (event.type === 'resize' || event.type === 'loadingdone')) collectionSizeDirty = true;
+        if (event && /^(transition|animation)/.test(event.type)) {
+            var row = collectionPosition && collectionPosition.row;
+            if (!row || !(row.contains(event.target) || event.target.contains(row))) return;
+            collectionMotionDirty = true;
+        }
         // Classic collection rows are stationary between interactions. Track
         // short hover/layout transitions, then sleep until something changes.
-        collectionPositionUntil = performance.now() + 400;
         if (pickerPositionFrame === null) pickerPositionFrame = requestAnimationFrame(trackPickerPosition);
     }
 
     function watchCollectionPosition() {
         if (!collectionPage || !pickerTarget) return;
-        if (!collectionPositionResize) collectionPositionResize = new ResizeObserver(wakeCollectionPosition);
+        collectionMotionDirty = true;
+        if (!collectionPositionResize) collectionPositionResize = new ResizeObserver(function () { collectionSizeDirty = true; wakeCollectionPosition(); });
         collectionPositionResize.disconnect();
-        [document.body, pickerTarget.anchor, picker].forEach(function (node) { collectionPositionResize.observe(node); });
-        if (!collectionPositionMutation) collectionPositionMutation = new MutationObserver(wakeCollectionPosition);
+        [document.body, collectionPosition?.row, pickerTarget.anchor, picker].forEach(function (node) { if (node) collectionPositionResize.observe(node); });
+        if (!collectionPositionMutation) collectionPositionMutation = new MutationObserver(function () {
+            collectionSizeDirty = true;
+            collectionMotionDirty = true;
+            wakeCollectionPosition();
+        });
         collectionPositionMutation.disconnect();
-        var row = pickerTarget.anchor.closest('.collectionItem');
-        if (row) collectionPositionMutation.observe(row, { attributes: true, attributeFilter: ['class', 'style'] });
+        var row = collectionPosition?.row;
+        if (row) {
+            collectionPositionMutation.observe(row, { attributes: true, attributeFilter: ['class', 'style', 'href'], childList: true, characterData: true, subtree: true });
+            for (var ancestor = row.parentElement; ancestor; ancestor = ancestor.parentElement) {
+                collectionPositionMutation.observe(ancestor, { attributes: true, attributeFilter: ['class', 'style'], childList: true });
+            }
+        }
         wakeCollectionPosition();
     }
 
     function setPickerProperty(element, property, value) {
-        if (element.style.getPropertyValue(property) !== value) element.style.setProperty(property, value);
+        var previous = element.style.getPropertyValue(property);
+        // CSSOM rounds serialized pixel values. Comparing the raw geometry
+        // string would rewrite the same fractional position on every wake.
+        if (previous === value || previous.endsWith('px') && value.endsWith('px') && Math.abs(parseFloat(previous) - parseFloat(value)) < 0.01) return;
+        element.style.setProperty(property, value);
     }
 
     function showPicker(target) {
@@ -1253,11 +1782,14 @@
             pickerTarget.anchor === target.anchor && pickerTarget.value === target.value &&
             picker && picker.style.display !== 'none') {
             positionPicker();
+            wakeWorkshopPosition();
             return;
         }
         pickerClosing = false;
         pickerHelpOpen = false;
         pickerTarget = target;
+        collectionPosition = null;
+        collectionSizeDirty = true;
         if (picker) picker.dataset.word = target.pinned ? target.value : '';
         target.href = target.anchor.getAttribute('href');
         target.text = target.anchor.textContent;
@@ -1265,10 +1797,12 @@
         var el = ensurePicker(target.quickView ? target.quickView.dialog : document.body);
         el.dataset.word = target.pinned ? target.value : '';
         el.style.display = 'flex';
+        if (el.style.visibility) el.style.removeProperty('visibility');
         highlightWord('wshs-selected-word', target.pinned ? target.range : null);
         renderPicker();
         positionPicker();
         watchCollectionPosition();
+        workshopStillFrames = 0;
         if (pickerTarget && pickerPositionFrame === null) {
             pickerPositionFrame = requestAnimationFrame(trackPickerPosition);
         }
@@ -1284,6 +1818,8 @@
         pickerHelpOpen = false;
         releasePickerRow();
         pickerTarget = null;
+        collectionPosition = null;
+        collectionAnimations = [];
         highlightWord('wshs-selected-word', null);
         if (hoverWordKey && (!hoverWordKey.link.isConnected || hoverWordKey.link.textContent !== hoverWordKey.text)) {
             hoverWordKey = null;
@@ -1491,6 +2027,13 @@
     function tick() {
         tickFrame = null;
         if (!loaded || !window.WSHSDom || (!collectionPage && !window.WSHSDom.isNewLayout())) return;
+        var renamed = false;
+        filters.forEach(function (f) {
+            if (f.kind !== 'dependency' || f.label !== f.value) return;
+            var title = window.WSHSDependencies.title(f.value);
+            if (title) { f.label = title; renamed = true; }
+        });
+        if (renamed) save();
         // The sidebar needs the full-page hydration gate, not only the sort
         // row's earlier readiness signal used by content.js.
         if (!isSettled()) {
@@ -1506,6 +2049,7 @@
         ensureQuickViewTools();
         alignCardActions();
         applyAuthorFilters();
+        wakeWorkshopPosition();
         prepareTitleLinks();
         syncWhitespaceChip();
         if (termsChanged && initialRefetchDone && getSearchInput()) refetchResults(true);
@@ -1543,34 +2087,78 @@
         if (tickFrame === null) tickFrame = requestAnimationFrame(tick);
     }
 
+    var filterDataSelector = ITEM_LINK + ',' + AUTHOR_LINK + ',' + PREVIEW + ',.collectionItem,.subscribeCollection,.collectionChildren';
+    var nativeControlSelector = 'input,select,form,[role="combobox"],[role="button"],button,h2,h3';
+    function relevantFilterNode(node) {
+        if (node.nodeType !== 1) return false;
+        if (node.closest('#workshop_item_hover,#global_hover,[popover],.wshs-picker,.wshs-folder-menu')) return false;
+        var selector = filterDataSelector + ',' + nativeControlSelector + ',dialog';
+        return node.matches(selector) || Array.from(node.querySelectorAll(selector)).some(function (match) {
+            return !match.closest('#workshop_item_hover,#global_hover,[popover],.wshs-picker,.wshs-folder-menu');
+        });
+    }
+
     new MutationObserver(function (mutations) {
         for (var i = 0; i < mutations.length; i++) {
             var target = mutations[i].target;
             var el = target.nodeType === 1 ? target : target.parentElement;
-            if (el && el.closest('.wshs-saved-filters, .wshs-picker, .wshs-injected-controls, .wshs-collection-summary')) continue;
-            if (mutations[i].addedNodes.length || mutations[i].removedNodes.length) {
+            if (el && el.closest('#workshop_item_hover, #global_hover, [popover], .wshs-saved-filters, .wshs-folder-menu, .wshs-picker, .wshs-injected-controls, .wshs-collection-summary, .wshs-collection-sizes, .wshs-design-counts, .wshs-design-row-meta, .wshs-design-subscribe-label')) continue;
+            if (mutations[i].type === 'attributes' && mutations[i].attributeName === 'class') {
+                // React owns card className and can overwrite our flags. Compare
+                // the final batch state so geometry's synchronous unhide/restore
+                // does not start an observer feedback loop.
+                var expected = cardFilterState.get(el);
+                if (expected && el.isConnected && (el.classList.contains('wshs-filtered') !== expected.hidden ||
+                    el.classList.contains('wshs-review-match') !== expected.match || el.classList.contains('wshs-review-omit') !== expected.omit)) scheduleTick();
+                continue;
+            }
+            var dataTarget = el && el.closest(ITEM_LINK + ',' + AUTHOR_LINK + ',.workshopItemTitle,.workshopItemAuthor,.workshopItemShortDesc');
+            var nativeTarget = el && (el.closest('form') || anchor && anchor.section.contains(el));
+            if (mutations[i].type === 'attributes' && mutations[i].attributeName === 'open' && el.matches('dialog[open]')) { scheduleTick(); return; }
+            if (mutations[i].type === 'characterData') {
+                if (dataTarget || nativeTarget) { scheduleTick(); return; }
+                continue;
+            }
+            if (mutations[i].type === 'attributes' && el && (el.matches(ITEM_LINK + ',' + AUTHOR_LINK + ',#CommunityTemplate') || el.closest('.collectionItem'))) {
+                scheduleTick(); return;
+            }
+            if ((mutations[i].addedNodes.length || mutations[i].removedNodes.length) &&
+                (dataTarget || nativeTarget || Array.from(mutations[i].addedNodes).concat(Array.from(mutations[i].removedNodes)).some(relevantFilterNode))) {
                 lastPageMutationAt = Date.now();
                 scheduleTick();
                 return;
             }
         }
-    }).observe(document, { childList: true, subtree: true });
+    }).observe(document, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['href', 'id', 'class', 'open'] });
 
     new MutationObserver(scheduleTick).observe(document.documentElement, {
         attributes: true,
         attributeFilter: ['data-wshs-page-hydrated']
     });
     window.addEventListener('resize', scheduleTick);
+    window.addEventListener('wshs-collection-search', scheduleTick);
+    window.addEventListener('wshs-appearance-ready', scheduleTick);
     if (collectionPage) {
         document.addEventListener('scroll', wakeCollectionPosition, { passive: true, capture: true });
-        document.addEventListener('mouseover', wakeCollectionPosition, { passive: true, capture: true });
-        document.addEventListener('mouseout', wakeCollectionPosition, { passive: true, capture: true });
         document.addEventListener('transitionrun', wakeCollectionPosition, true);
         document.addEventListener('transitionend', wakeCollectionPosition, true);
+        document.addEventListener('transitioncancel', wakeCollectionPosition, true);
+        document.addEventListener('animationstart', wakeCollectionPosition, true);
+        document.addEventListener('animationend', wakeCollectionPosition, true);
+        document.addEventListener('animationcancel', wakeCollectionPosition, true);
         document.addEventListener('load', wakeCollectionPosition, true);
         window.addEventListener('resize', wakeCollectionPosition);
+        document.fonts.addEventListener('loadingdone', wakeCollectionPosition);
+    } else {
+        ['transitionrun', 'transitionend', 'transitioncancel', 'animationstart', 'animationend', 'animationcancel', 'load', 'mousemove'].forEach(function (type) {
+            document.addEventListener(type, wakeWorkshopPosition, true);
+        });
+        document.addEventListener('scroll', wakeWorkshopPosition, { passive: true, capture: true });
+        window.addEventListener('resize', wakeWorkshopPosition);
+        document.fonts.addEventListener('loadingdone', wakeWorkshopPosition);
     }
-    if (collectionPage) window.WSHSDescriptions.onChange(scheduleTick);
+    window.WSHSDescriptions.onChange(scheduleTick);
+    window.WSHSDependencies.onChange(scheduleTick);
     document.fonts.addEventListener('loadingdone', scheduleTick);
     scheduleTick();
 })();

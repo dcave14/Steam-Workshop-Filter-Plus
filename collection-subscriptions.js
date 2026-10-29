@@ -167,9 +167,9 @@
         e.stopImmediatePropagation();
         if (busy) { alert('Subscriptions are updating', 'Wait for the current update to finish, or stop it first.'); return; }
         if (!plan) { alert('Saved filters are loading', target.getAttribute('data-wshs-subscription-error') || 'Wait for your saved filters to load, then click Subscribe to all again.'); return; }
-        if (!plan.allowed.length) { alert('No matching mods', 'Your saved filters exclude every mod in this collection. Change the filters before subscribing.'); return; }
+        if (!plan.allowed.length) { alert('No matching mods', 'Your filters exclude every mod in this collection. Change the filters before subscribing.'); return; }
         if (typeof window.ShowConfirmDialog !== 'function' || typeof window.SubscribeCollection !== 'function') return;
-        var reminder = plan.excluded.length + (plan.excluded.length === 1 ? ' mod is' : ' mods are') + ' excluded by your saved filters and will not be added. ' + plan.allowed.length + (plan.allowed.length === 1 ? ' mod remains.' : ' mods remain.') +
+        var reminder = plan.excluded.length + (plan.excluded.length === 1 ? ' mod is' : ' mods are') + ' excluded by your filters and will not be added. ' + plan.allowed.length + (plan.allowed.length === 1 ? ' mod remains.' : ' mods remain.') +
             '<br><br>Add Only keeps your existing subscriptions, including any excluded mods you already have. Overwrite replaces them with only the eligible collection mods.';
         window.ShowConfirmDialog('Saved filters apply to this collection', reminder, 'Continue').done(function (action) {
             if (action !== 'OK') return;

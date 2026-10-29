@@ -21,6 +21,7 @@
 
 (function () {
     'use strict';
+    if (!/\/workshop\/browse\/?$/.test(location.pathname)) return;
 
     var ROOT_CLASS = 'wshs-sort-popover';
     // Fixed horizontal cost of the compact layout: 2 x 9px padding, 6px column

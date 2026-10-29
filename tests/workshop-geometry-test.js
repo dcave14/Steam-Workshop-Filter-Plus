@@ -14,7 +14,7 @@ const measure = `(() => {
         return { x:r.x, y:r.y, w:r.width, h:r.height, font:getComputedStyle(b).fontSize };
     });
     const geometry = WSHSDom.getCardGeometry();
-    return { rects, gaps:rects.slice(1).map((r,i)=>r.x-rects[i].x-rects[i].w),
+    return { rects, gaps:rects.slice(1).map((r,i)=>Math.abs(r.y-rects[i].y)>.5?null:r.x-rects[i].x-rects[i].w),
         grid:geometry && { width:geometry.width,gap:geometry.gap,columns:geometry.columns },
         cards:WSHSDom.enumerateCards().length,
         dialogCards:WSHSDom.enumerateCards().filter(c=>c.root.closest('dialog,[role=dialog],[aria-modal=true]')).length,
@@ -28,7 +28,7 @@ function same(actual, expected, label, fallback = false) {
         for (const k of (fallback ? ['w','h'] : ['x','y','w','h'])) assert.ok(Math.abs(actual.rects[i][k]-expected.rects[i][k]) <= .5, `${label}: button ${i} ${k}`);
         assert.equal(actual.rects[i].font, expected.rects[i].font, `${label}: font`);
     }
-    for (let i = 0; i < (fallback ? 1 : 3); i++) assert.ok(Math.abs(actual.gaps[i]-expected.gaps[i])<=.5, `${label}: gap ${i}`);
+    for (let i = 0; i < (fallback ? 1 : 3); i++) assert.ok(actual.gaps[i]===null&&expected.gaps[i]===null||actual.gaps[i]!==null&&expected.gaps[i]!==null&&Math.abs(actual.gaps[i]-expected.gaps[i])<=.5, `${label}: gap ${i}`);
     assert.equal(actual.leaked, 0, `${label}: hidden-card leak`);
     checks++; console.log('PASS '+label);
 }
@@ -44,7 +44,7 @@ function same(actual, expected, label, fallback = false) {
         await page.evaluate(()=>document.fonts.ready);
         await wait(750);
         const baseline = await world(measure);
-        assert.ok(baseline.gaps.every(g=>g>4), 'baseline has separated buttons');
+        assert.ok(baseline.gaps.every(g=>g===null||g>4), 'baseline has separated buttons within each toolbar row');
         for (const close of ['cross','escape','cross']) {
             await world(`WSHSDom.enumerateCards().find(c=>c.root.querySelector('svg.SVGIcon_MagnifyingGlass')).root.querySelector('svg.SVGIcon_MagnifyingGlass').closest('[role=button]').click()`);
             await page.waitForSelector('dialog[open]');
@@ -55,7 +55,7 @@ function same(actual, expected, label, fallback = false) {
             assert.equal(during.cards,baseline.cards,'Quick View does not add browse cards');
             // Steam may change scrollbar space while a modal is open; the
             // measured card width may follow that, but the gaps must not collapse.
-            assert.ok(during.gaps.every(g=>Math.abs(g-during.grid.gap)<=.5),'Quick View gaps follow browse columns');
+            assert.ok(during.gaps.every(g=>g===null||Math.abs(g-during.grid.gap)<=.5),'Quick View gaps follow browse columns');
             if(close==='escape') await page.keyboard.press('Escape');
             else await page.evaluate(()=>document.querySelector('dialog[open] svg.SVGIcon_X').closest('[role=button]').click());
             // Keep the pointer away from all cards: hovering used to hide the bug.
@@ -106,6 +106,11 @@ function same(actual, expected, label, fallback = false) {
         // Simulate the all-hidden case regardless of the live page's rating mix.
         await world(`WSHSDom.enumerateCards().forEach(c=>c.root.classList.add('hidden-item'))`);
         same(await world(measure),beforeHeavy,'all cards hidden preserves geometry');
+        await world(`chrome.storage.local.set({'savedFilters:294100':[{kind:'keyword',value:'NoSuchInspectionFixture987654321',label:'NoSuchInspectionFixture987654321',state:-1}]})`);
+        await page.waitForSelector('.wshs-sf-inspect');
+        await page.click('.wshs-sf-inspect');await wait(100);
+        same(await world(measure),beforeHeavy,'zero-match inspection preserves geometry');
+        await page.click('.wshs-review-exit');
         assert.equal(errors.length,0,errors.join('\n'));
         await page.screenshot({path:path.join(__dirname,'out','all-hidden-geometry.png')});
         console.log(`${checks} geometry checks passed; no page errors.`);

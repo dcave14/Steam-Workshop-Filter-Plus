@@ -17,7 +17,10 @@
     var retry = document.createElement('button'); retry.type = 'button'; retry.className = 'wshs-size-retry'; retry.textContent = 'Retry'; retry.hidden = true;
     summary.append(total, filtered, retry); header.appendChild(summary);
     var frame = null, loading = false, refreshAgain = false;
-    var cachedRows = null;
+    var cachedRows = null, visibility = new WeakMap();
+    function visible(row) {
+        return !row.classList.contains('wshs-filtered') && !row.classList.contains('hidden-item') && !row.classList.contains('wshs-ratings-filtered');
+    }
     var sizeFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
     function items() {
         var result = new Map();
@@ -30,8 +33,9 @@
         cachedRows.forEach(function (item) {
             var row = item.row, id = item.id;
             if (!row.isConnected) return;
-            var visible = !row.classList.contains('wshs-filtered') && !row.classList.contains('hidden-item') && !row.classList.contains('wshs-ratings-filtered');
-            result.set(id, visible || result.get(id) || false);
+            var eligible = visible(row);
+            visibility.set(row, eligible);
+            result.set(id, eligible || result.get(id) || false);
         });
         return result;
     }
@@ -49,13 +53,15 @@
         if (missing === ids.length && missing) return { text: 'Unavailable (' + missing + ' mods)', missing: missing };
         return { text: (missing ? '≥ ' : '') + format(bytes) + (missing ? ' · ' + missing + ' unavailable' : ''), missing: missing, bytes: bytes };
     }
+    // Replacing a text node (textContent) makes Chrome recheck Steam's
+    // :root:has() rules across the whole page; editing the node's data does not.
+    function text(n, value) { if (n.textContent === value) return; if (n.firstChild?.nodeType === 3 && !n.firstChild.nextSibling) n.firstChild.nodeValue = value; else n.textContent = value; }
     function render() {
         frame = null;
         var rows = items(), full = Array.from(rows.keys()), eligible = full.filter(function (id) { return rows.get(id); });
         var all = value(full), selected = value(eligible);
-        var a = 'Total: ' + all.text, b = 'After filters: ' + selected.text;
-        if (total.textContent !== a) total.textContent = a;
-        if (filtered.textContent !== b) filtered.textContent = b;
+        text(total, 'Total: ' + all.text);
+        text(filtered, 'After filters: ' + selected.text);
         summary.dataset.totalBytes = all.bytes === undefined ? '' : String(all.bytes);
         summary.dataset.filteredBytes = selected.bytes === undefined ? '' : String(selected.bytes);
         summary.dataset.totalMissing = String(all.missing);
@@ -76,10 +82,11 @@
     WSHSMetadata.onChange(schedule);
     new MutationObserver(function (changes) {
         var identityChanged = changes.some(function (m) { return m.type === 'attributes' && (m.attributeName === 'href' || m.attributeName === 'id'); });
-        if (identityChanged || changes.some(function (m) { return m.type === 'childList'; })) cachedRows = null;
+        var rowsChanged = changes.some(function (m) { return m.type === 'childList' && Array.from(m.addedNodes).concat(Array.from(m.removedNodes)).some(function (n) { return n.nodeType === 1 && (n.matches('.collectionItem') || n.querySelector('.collectionItem')); }); });
+        if (identityChanged || rowsChanged) cachedRows = null;
         if (identityChanged) { schedule(); refresh(); }
-        if (changes.some(function (m) { return m.type === 'attributes' && m.target.matches('.collectionItem'); })) schedule();
-        if (changes.some(function (m) { return m.type === 'childList' && Array.from(m.addedNodes).concat(Array.from(m.removedNodes)).some(function (n) { return n.nodeType === 1 && (n.matches('.collectionItem') || n.querySelector('.collectionItem')); }); })) { schedule(); refresh(); }
+        if (changes.some(function (m) { return m.type === 'attributes' && m.target.matches('.collectionItem') && visibility.get(m.target) !== visible(m.target); })) schedule();
+        if (rowsChanged) { schedule(); refresh(); }
     }).observe(children, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'href', 'id'] });
     refresh();
 })();
