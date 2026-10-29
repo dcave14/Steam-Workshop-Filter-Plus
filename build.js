@@ -37,10 +37,6 @@ function manifestFiles(manifest) {
         for (const f of script.css || []) files.add(f);
     }
     for (const f of Object.values(manifest.icons || {})) files.add(f);
-    if (manifest.background && manifest.background.service_worker) files.add(manifest.background.service_worker);
-    for (const f of manifest.background && manifest.background.scripts || []) files.add(f);
-    if (manifest.options_ui) ['options.html', 'options.css', 'options.js', 'api-config.js', 'api-data.js'].forEach(f => files.add(f));
-    if (manifest.action && manifest.action.default_popup) ['popup.html', 'popup.css', 'popup.js'].forEach(f => files.add(f));
     return [...files];
 }
 
@@ -117,6 +113,5 @@ for (const file of manifestFiles(source)) {
 
 build('chrome', source);
 const firefox = JSON.parse(JSON.stringify(source));
-firefox.background = { scripts: ['api-config.js', 'api-data.js', source.background.service_worker] };
 firefox.browser_specific_settings = { gecko: GECKO, gecko_android: { strict_min_version: '142.0' } };
 build('firefox', firefox);

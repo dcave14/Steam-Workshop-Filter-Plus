@@ -87,15 +87,15 @@ function pass(label) {checks++;console.log('PASS '+label);}
         assert.ok(requests.includes('"mechs"'),'the changed filter reaches Steam');
         pass('hide armor -> only mechs sends a new query and shows mechs results');
 
-        await setFilters([filter('mechs',1),filter('armor',-1)],false);
-        assert.ok(requests.every(text=>!text.includes('-"armor"')),'minus stays out of Steam search');
+        await setFilters([filter('mechs',1),filter('armor',-1)]);
+        assert.ok(requests.includes('"mechs" -"armor"'));
         await page.type('#CommunityTemplate form input[type=text]','vanilla');
         await page.keyboard.press('Enter');
         await page.waitForFunction(()=>document.querySelector('#CommunityTemplate form input[type=text]').value.trim()==='vanilla');
         await wait(500);
-        assert.ok(requests.some(text=>text.trim()==='vanilla')&&!requests.includes('vanilla "mechs"'),'native typed search stays independent of positive saved phrases');
-        assert.ok(targets.filter((t,i)=>requests[i]==='"mechs"').every(t=>t.body===1&&t.url==='1'),'blank-query saved keyword optimization uses Title Only scope');
-        pass('saved keywords filter native search results locally without changing the query or its scope');
+        assert.ok(requests.includes('vanilla "mechs" -"armor"'),'typed search and both saved keywords reach Steam together');
+        assert.ok(targets.length>0&&targets.every(t=>t.body===1&&t.url==='1'),'saved keyword requests use native Title Only scope in both body and URL');
+        pass('multiple saved keywords combine with the user search without polluting its text');
 
         await world(`chrome.storage.local.set({'savedFilters:294100':[]})`);
         await openBrowse(page);

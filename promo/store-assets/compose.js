@@ -68,9 +68,6 @@ h1 { font-family: 'Sora', sans-serif; font-weight: 700; margin: 0; letter-spacin
 .ext { width: 22px; height: 22px; border-radius: 5px; }
 .view { position: absolute; left: 0; right: 0; top: 38px; bottom: 0; overflow: hidden; }
 .view img { position: absolute; }
-.inset { position: absolute; overflow: hidden; border-radius: 8px; background: #1b2838;
-    box-shadow: 0 18px 50px rgba(0,0,0,0.6), 0 0 0 2px #1a9fff; }
-.inset img { position: absolute; }
 `;
 
 function windowHtml(o) {
@@ -97,26 +94,17 @@ const BROWSE_PATH = '/workshop/browse/?appid=294100';
 const COLLECTION_PATH = '/sharedfiles/filedetails/?id=3811511129';
 
 const SCREENSHOTS = [
-    { n: 1, eyebrow: 'Collections', title: 'Collections, redesigned like the Workshop.',
-      raw: 'collection', url: COLLECTION_PATH, crop: { x: 0, y: 134, w: 1600 } },
-    { n: 2, eyebrow: 'Saved filters', title: 'Hide any keyword or creator, saved per game.',
+    { n: 1, eyebrow: 'Saved filters', title: 'Hide any keyword or creator, saved per game.',
       raw: 'browse-saved', url: BROWSE_PATH, crop: { x: 15, y: 40, w: 947 } },
+    { n: 2, eyebrow: 'Title words', title: 'Click a word in any title to filter by it.',
+      raw: 'browse-word', url: BROWSE_PATH, crop: { x: 650, y: 60, w: 935 } },
     { n: 3, eyebrow: 'Ratings + stars', title: 'Hide what you have. Keep what’s rated well.',
       raw: 'browse-star-menu', url: BROWSE_PATH, crop: { x: 340, y: 100, w: 1250 } },
     { n: 4, eyebrow: 'Collection sizes', title: 'See how big a collection is, before and after filters.',
-      raw: 'collection-sizes', url: COLLECTION_PATH, crop: { x: 0, y: 10, w: 1600 },
-      // Steam's stats strip is small; magnify the real Total / After filters text.
-      inset: { x: 745, y: 18, w: 330, h: 28, scale: 2.2, left: 277, top: 300 } },
-    { n: 5, eyebrow: 'Compact layout', title: 'Six cards per row, with your filters in a sidebar.',
-      raw: 'browse-compact', url: BROWSE_PATH, crop: { x: 10, y: 30, w: 1590 } }
+      raw: 'collection-sizes', url: COLLECTION_PATH, crop: { x: 315, y: 100, w: 680 } },
+    { n: 5, eyebrow: 'Collections', title: 'Your saved filters work on collections too.',
+      raw: 'collection-saved', url: COLLECTION_PATH, crop: { x: 315, y: 250, w: 680 } }
 ];
-
-// A magnified crop of the same raw capture, laid over the window.
-function insetHtml(i, raw) {
-    return `<div class="inset" style="left:${i.left}px; top:${i.top}px; width:${i.w * i.scale}px; height:${i.h * i.scale}px;">
-  <img src="${dataUri(path.join(RAW, raw + '.png'))}" style="width:${RAW_W * i.scale}px; left:${-i.x * i.scale}px; top:${-i.y * i.scale}px;">
-</div>`;
-}
 
 function screenshotHtml(s) {
     return `<!doctype html><html><head>${FONTS}<style>${BASE_CSS}
@@ -126,7 +114,6 @@ h1 { font-size: 40px; margin-top: 14px; }
 </style></head><body><div class="glow"></div>
 <div class="head"><div class="eyebrow"><b>0${s.n}</b>${s.eyebrow}</div><h1>${s.title}</h1></div>
 ${windowHtml({ x: 130, y: 172, w: 1020, h: 590, raw: s.raw, crop: s.crop, url: s.url })}
-${s.inset ? insetHtml(s.inset, s.raw) : ''}
 </body></html>`;
 }
 
@@ -142,7 +129,7 @@ p b { color: #eef3f8; font-weight: 600; }
 </style></head><body><div class="glow"></div>
 <div class="wrap">
   <div class="brand"><img src="${dataUri(ICON)}"><h1>Steam Workshop<br>Filter Plus</h1></div>
-  <p><b>Hide subscribed mods</b>, <b>filter by rating</b> and <b>save keyword filters</b> on Workshop pages and redesigned collections.</p>
+  <p><b>Hide subscribed mods</b>, <b>filter by rating</b> and <b>save keyword filters</b> on Workshop pages and collections.</p>
 </div></body></html>`;
 }
 
@@ -163,7 +150,7 @@ li::before { content: ''; width: 8px; height: 8px; border-radius: 50%; backgroun
     <li>Hide mods you\u2019re already subscribed to</li>
     <li>Filter by stars and number of ratings</li>
     <li>Save keyword and creator filters per game</li>
-    <li>Workshop-style collection pages with sizes</li>
+    <li>Collection sizes before and after filters</li>
   </ul>
 </div>
 ${windowHtml({ x: 620, y: 60, w: 740, h: 440, raw: 'browse-saved', crop: { x: 15, y: 40, w: 930 }, url: BROWSE_PATH })}

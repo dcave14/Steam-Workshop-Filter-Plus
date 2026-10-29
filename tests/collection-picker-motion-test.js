@@ -1,5 +1,5 @@
 const assert=require('assert/strict');
-const {launch,closeBrowser,wait,installFrameSampler}=require('./browser-helpers');
+const {launch,closeBrowser,wait}=require('./browser-helpers');
 let checks=0;function check(name,value){assert.ok(value,name);checks++;console.log('PASS '+name)}
 (async()=>{const browser=await launch(process.argv.includes('--firefox')?'firefox':undefined);try{
  const page=await browser.newPage();await page.setViewport({width:1280,height:1000});
@@ -10,10 +10,10 @@ let checks=0;function check(name,value){assert.ok(value,name);checks++;console.l
  check('resting controls remain flush with creator text',await aligned());
  await page.evaluate(()=>scrollBy(0,25));await wait(100);check('scrolling wakes resting controls',await aligned());
  await page.hover('.collectionItem .workshopItemAuthorName a');await wait(650);
- await installFrameSampler(page);const maxError=await page.evaluate(async()=>{
+ const maxError=await page.evaluate(async()=>{
   const row=document.querySelector('.collectionItem'),a=row.querySelector('.workshopItemAuthorName a'),p=document.querySelector('.wshs-picker');
   row.style.transition='transform 650ms linear';row.style.transform='translateY(-5px)';let max=0;
-  await new Promise(resolve=>{const end=performance.now()+800;function sample(){const x=a.getBoundingClientRect(),y=p.getBoundingClientRect();max=Math.max(max,Math.abs(x.top+x.height/2-y.top-y.height/2));if(performance.now()<end)__wshsAfterFrame(sample);else resolve();}__wshsAfterFrame(sample)});
+  await new Promise(resolve=>{const end=performance.now()+800;function sample(){const x=a.getBoundingClientRect(),y=p.getBoundingClientRect();max=Math.max(max,Math.abs(x.top+x.height/2-y.top-y.height/2));if(performance.now()<end)requestAnimationFrame(sample);else resolve();}requestAnimationFrame(sample)});
   row.style.removeProperty('transition');row.style.removeProperty('transform');return max;
  });await wait(100);console.log('Maximum transition offset: '+maxError.toFixed(3)+'px');check('long transitions keep controls attached',maxError<.5);
  await page.setViewport({width:1024,height:1000});await wait(150);check('resizing wakes and realigns controls',await aligned());

@@ -22,11 +22,7 @@
     async function load(ids) {
         for (var offset = 0; offset < ids.length; offset += 100) {
             var batch = ids.slice(offset, offset + 100), rows = null;
-            var api = window.WSHSApiClient ? await window.WSHSApiClient.get(batch) : { active: false };
-            if (api.active) {
-                if (api.ok) rows = api.rows.filter(function (row) { return typeof row.description === 'string'; }).map(function (row) { return { publishedfileid: row.id, result: 1, description: row.description }; });
-            }
-            for (var attempt = 0; !api.active && attempt < 2; attempt++) {
+            for (var attempt = 0; attempt < 2; attempt++) {
                 try {
                     // Literal brackets are accepted by Steam's public form endpoint.
                     var body = 'itemcount=' + batch.length + batch.map(function (id, i) { return '&publishedfileids[' + i + ']=' + id; }).join('');
@@ -53,7 +49,7 @@
             // Some accessible Workshop pages are omitted by the public API.
             // Read only those pages, at most four at a time.
             var incomplete = batch.filter(function (id) { return get(id) === null; });
-            if (!api.active) for (var i = 0; i < incomplete.length; i += 4) await Promise.all(incomplete.slice(i, i + 4).map(readDetailPage));
+            for (var i = 0; i < incomplete.length; i += 4) await Promise.all(incomplete.slice(i, i + 4).map(readDetailPage));
             batch.forEach(function (id) { if (get(id) === null) failures.set(id, Date.now() + 60000); });
             notify();
         }

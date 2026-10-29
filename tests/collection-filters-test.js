@@ -1,5 +1,5 @@
 const assert=require('assert/strict'),fs=require('fs'),path=require('path');
-const {launch,closeBrowser,extensionWorld,openBrowse,wait,BASE_URL,installFrameSampler}=require('./browser-helpers');
+const {launch,closeBrowser,extensionWorld,openBrowse,wait,BASE_URL}=require('./browser-helpers');
 const URL='https://steamcommunity.com/sharedfiles/filedetails/?id=3521297585';
 let checks=0;function check(name,value){assert.ok(value,name);checks++;console.log('PASS '+name);}
 (async()=>{
@@ -7,14 +7,13 @@ let checks=0;function check(name,value){assert.ok(value,name);checks++;console.l
  try{
   page=await browser.newPage();await page.setViewport({width:1280,height:1000});
   const errors=[];page.on('pageerror',e=>{errors.push(e.message);console.error('Collection page error:',e.message)});
-  await page.goto(URL,{waitUntil:'load',timeout:60000});await page.waitForSelector('.wshs-design-collection');
+  await page.goto(URL,{waitUntil:'load',timeout:60000});await page.waitForSelector('.wshs-collection-filters');
   const world=await extensionWorld(page);
   const plan=()=>page.$eval('[data-wshs-subscription-plan]',b=>JSON.parse(b.getAttribute('data-wshs-subscription-plan')));
   const rows=()=>page.$$eval('.wshs-sf-chip',r=>r.length);
   const baseline=await plan();
-  const actualItems=await page.$$eval('.collectionItemDetails > a[href*="filedetails"]',as=>new Set(as.map(a=>new URL(a.href).searchParams.get('id')).filter(Boolean)).size);
-  check('collection identifies RimWorld and includes every current item',baseline.appId==='294100'&&actualItems>0&&baseline.allowed.length===actualItems&&baseline.excluded.length===0);
-  check('saved filters sit beside the original native and extension toolbar',await page.evaluate(()=>!!document.querySelector('.wshs-design-sidebar .wshs-collection-filters')&&!!document.querySelector('.wshs-design-results .subscribeCollection')));
+  check('collection identifies RimWorld without appid in its URL',baseline.appId==='294100'&&baseline.allowed.length>800);
+  check('panel follows the existing native and extension toolbar',await page.evaluate(()=>document.querySelector('.subscribeCollection').nextElementSibling.matches('.wshs-collection-filters')));
   await page.$eval('.subscribeCollection',e=>e.scrollIntoView());
   check('Save, phrase field and help share the native 30px height',await page.$$eval('.wshs-sf-add>*',es=>es.every(e=>Math.abs(e.getBoundingClientRect().height-30)<.1)));
   await page.hover('.collectionItem .workshopItemAuthorName a');await wait(150);
@@ -23,12 +22,11 @@ let checks=0;function check(name,value){assert.ok(value,name);checks++;console.l
    return p.children.length===4&&Math.abs(b.left-r.right-4)<.1&&Math.abs(b.top+b.height/2-r.top-r.height/2)<.1&&[...p.children].every(c=>c.getBoundingClientRect().height===parseFloat(getComputedStyle(a).fontSize));
   }));
   await wait(600);
-  await installFrameSampler(page);
   const motion=await page.evaluate(async()=>{
    const row=document.querySelector('.collectionItem'),author=row.querySelector('.workshopItemAuthorName a'),picker=document.querySelector('.wshs-picker');
    row.style.transition='transform 650ms linear';row.style.transform='translateY(-5px)';
    let maxError=0,frames=0;
-   await new Promise(resolve=>{const until=performance.now()+800;function sample(){const a=author.getBoundingClientRect(),p=picker.getBoundingClientRect();maxError=Math.max(maxError,Math.abs(a.top+a.height/2-p.top-p.height/2));frames++;if(performance.now()<until)__wshsAfterFrame(sample);else resolve();}__wshsAfterFrame(sample)});
+   await new Promise(resolve=>{const until=performance.now()+800;function sample(){const a=author.getBoundingClientRect(),p=picker.getBoundingClientRect();maxError=Math.max(maxError,Math.abs(a.top+a.height/2-p.top-p.height/2));frames++;if(performance.now()<until)requestAnimationFrame(sample);else resolve();}requestAnimationFrame(sample)});
    row.style.removeProperty('transition');row.style.removeProperty('transform');return{maxError,frames};
   });await wait(100);
   check('collection controls track longer transitions after resting',motion.frames>10&&motion.maxError<.5);

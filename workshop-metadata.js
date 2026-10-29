@@ -47,11 +47,7 @@
         var missing = ids.filter(function (id) { return force || !ready(id, fields); });
         for (var start = 0; start < missing.length; start += 100) {
             var batch = missing.slice(start, start + 100), rows = null;
-            var api = window.WSHSApiClient ? await window.WSHSApiClient.get(batch) : { active: false };
-            if (api.active) {
-                if (api.ok) rows = api.rows.map(function (row) { return { publishedfileid: row.id, file_size: row.size, total_votes: row.ratings }; });
-            }
-            for (var attempt = 0; !api.active && attempt < 2; attempt++) {
+            for (var attempt = 0; attempt < 2; attempt++) {
                 try {
                     var url = new URL('/sharedfiles/actions', location.origin);
                     url.searchParams.set('q', 'GetUGCSummary');

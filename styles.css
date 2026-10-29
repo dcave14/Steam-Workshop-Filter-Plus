@@ -14,14 +14,14 @@
 .wshs-ratings-retry { border: 0; background: none; padding: 8px; color: #67c1f5; font: 12px Arial, sans-serif; cursor: pointer; }
 .wshs-ratings-retry[hidden] { display: none; }
 
-/* Collection: two aligned rows of three; reset lives in the saved-filter header. */
+/* Collection: three native actions, then Star / Hide Subscribed / Ratings. */
 .subscribeCollection.wshs-six-controls { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
 .subscribeCollection.wshs-six-controls > .general_btn {
     width: auto; min-width: 0; margin: 0; height: 30px; box-sizing: border-box;
     padding: 0 28px; text-align: center; white-space: nowrap;
 }
 .subscribeCollection.wshs-six-controls > div[style*="clear"] { display: none; }
-.subscribeCollection.wshs-six-controls .wshs-collection-controls { display:grid!important;grid-column:1/-1;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px; }
+.subscribeCollection.wshs-six-controls .wshs-collection-controls { display: contents !important; }
 .subscribeCollection.wshs-six-controls .wshs-collection-controls > div,
 .subscribeCollection.wshs-six-controls .wshs-collection-controls > button { min-width: 0; margin: 0; }
 .subscribeCollection.wshs-six-controls .wshs-collection-controls .hide-subscribed-button { width: 100%; margin: 0; padding: 0 28px; }
@@ -32,8 +32,7 @@
 /* Injected controls rebuilt with the chrome of Steam's native new-layout sort
    button: translucent dark, blurred, square corners, one uniform 13px label on
    all three controls (star, hide and the native sort button). */
-.hide-subscribed-button,
-.wshs-toolbar-reset {
+.hide-subscribed-button {
     background: #0000005e;
     -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
@@ -53,16 +52,13 @@
 /* Workshop page: the buttons carry the same drop shadow as the dropdowns
    (Steam's sort popover and the star dropdown) so the controls read as one
    set. content.js applies the same shadow to Steam's sort button inline. */
-.wshs-new-layout-controls .hide-subscribed-button,
-.wshs-toolbar-reset {
+.wshs-new-layout-controls .hide-subscribed-button {
     box-shadow: 1px 1px 10px 0 rgba(0, 0, 0, 0.6);
 }
 
 .hide-subscribed-button:hover,
 .hide-subscribed-button:active,
-.hide-subscribed-button.active,
-.wshs-toolbar-reset:hover,
-.wshs-toolbar-reset:active {
+.hide-subscribed-button.active {
     color: #fff;
 }
 
@@ -340,7 +336,7 @@
     white-space: nowrap;
 }
 
-/* Collection page: all six buttons (the 3 native ones and our 3 filters) carry
+/* Collection page: all five buttons (the 3 native ones and our 2 chips) carry
    the same drop shadow as the star dropdown, as on the workshop page. */
 .wshs-collection-controls .hide-subscribed-button,
 .subscribeCollection:has(> .wshs-collection-controls) > .general_btn {

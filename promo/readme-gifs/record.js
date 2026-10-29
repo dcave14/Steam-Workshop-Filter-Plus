@@ -8,10 +8,9 @@
 //   saved-filters.gif  RimWorld browse page: save a keyword from the sidebar,
 //                      then hide a creator from the card picker (with its
 //                      2.5-second undo window)
-//   collection.gif     "Genesis Mod Pack" (RimWorld, mixed 4/5-star items) in the
-//                      redesigned layout: Hide Subscribed, 5 Stars Only and
-//                      100+ Ratings with the shown count updating, a long scroll
-//                      under the floating Back to top, then back to the sizes
+//   collection.gif     "Genesis Mod Pack" (RimWorld, mixed 4/5-star items):
+//                      Hide Subscribed, 5 Stars Only and 100+ Ratings, with the
+//                      Total / After filters sizes updating, then scroll the list
 //
 // Usage: node record.js [--convert-only] [--only workshop|saved-filters|collection]
 //   (writes to ../out/readme-gifs/; needs ffmpeg on PATH; --convert-only
@@ -39,19 +38,31 @@ const OUT = path.resolve(__dirname, '..', 'out', 'readme-gifs');
 
 const VIEWPORT = { width: 1600, height: 900 };
 const GIF_FPS = 12;
+// The collection page sits in a 950px column (x 325-1275 at a 1600px
+// viewport); the cursor rests in the margin just right of it, inside the crop.
+const MARGIN_X = 1288;
 
 const WORKSHOP_URL = 'https://steamcommunity.com/workshop/browse/?appid=108600&browsesort=trend&section=readytouseitems';
 const COLLECTION_URL = 'https://steamcommunity.com/sharedfiles/filedetails/?id=3798004429';
 const SAVED_FILTERS_URL = 'https://steamcommunity.com/workshop/browse/?appid=294100&browsesort=trend&section=readytouseitems';
 
-// Records the exact Chrome package build.js produces (background worker, popup,
-// options and content scripts), rebuilt first so it matches the sources.
+// The files manifest.json lists, the same set build.js packages.
+function extensionFiles() {
+    const manifest = JSON.parse(fs.readFileSync(path.join(EXT_SRC, 'manifest.json'), 'utf8'));
+    const files = new Set(['manifest.json', ...Object.values(manifest.icons || {})]);
+    for (const script of manifest.content_scripts || []) {
+        for (const f of [...(script.js || []), ...(script.css || [])]) files.add(f);
+    }
+    return [...files];
+}
+
 function copyExtension() {
-    execFileSync(process.execPath, [path.join(EXT_SRC, 'build.js')], { cwd: EXT_SRC, stdio: 'ignore' });
-    const built = path.join(EXT_SRC, 'dist', 'chrome');
     // Chrome's Extensions.loadUnpacked rejects paths containing spaces.
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wshs-gif-'));
-    fs.cpSync(built, dir, { recursive: true });
+    for (const file of extensionFiles()) {
+        fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+        fs.copyFileSync(path.join(EXT_SRC, file), path.join(dir, file));
+    }
     return dir;
 }
 
@@ -142,7 +153,7 @@ function mockCollectionSubscriptions(count) {
     let marked = 0;
     for (let i = 1; i < items.length && marked < count; i += 2) {
         if (stars(items[i]) < 5) continue;
-        const btn = items[i].querySelector('.subscriptionControls .general_btn, a.general_btn.subscribe');
+        const btn = items[i].querySelector('a.general_btn.subscribe');
         if (btn) {
             btn.classList.add('toggled');
             marked += 1;
@@ -173,16 +184,6 @@ async function clickOn(page, target, steps) {
     const p = await moveTo(page, target, steps);
     await wait(250);
     await page.mouse.click(p.x, p.y);
-}
-
-// Scrolls the page itself; wheel events would scroll whatever scrollable pane
-// (author list, pinned sidebar) sits under the cursor.
-async function scrollPage(page, dy, steps) {
-    const n = steps || 30;
-    for (let i = 0; i < n; i++) {
-        await page.evaluate(d => window.scrollBy(0, d), dy / n);
-        await wait(25);
-    }
 }
 
 async function smoothScroll(page, dy, steps) {
@@ -243,66 +244,57 @@ async function recordWorkshop(page, webm) {
     await clickOn(page, TOP_RATED, 15);
     await wait(500);
     await page.keyboard.press('Escape');
-    // Close the sort menu on plain heading text (the sidebar's search settings
-    // gear sits where an offset click used to land).
-    const heading = await center(page, 'fn:() => { const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); ' +
-        'while (w.nextNode()) if (/^\\s*Browsing:/.test(w.currentNode.nodeValue)) return w.currentNode.parentElement; }');
-    await page.mouse.move(heading.x, heading.y, { steps: 10 });
-    await page.mouse.click(heading.x, heading.y);
+    const sort = await center(page, SORT_BUTTON);
+    await page.mouse.move(sort.x - 200, sort.y - 70, { steps: 10 });
+    await page.mouse.click(sort.x - 200, sort.y - 70);
     await wait(2200);
     await recorder.stop();
 }
 
 async function recordCollection(page, webm) {
     await page.goto(COLLECTION_URL, { waitUntil: 'load', timeout: 60000 });
-    await page.waitForSelector('.wshs-design-items', { timeout: 30000 });
-    await page.waitForFunction(() => document.querySelector('.wshs-collection-sizes')?.getAttribute('aria-busy') === 'false', { timeout: 30000 });
-    // Steam's item preview pops up beside hovered rows; keep it out of the GIF.
-    await page.addStyleTag({ content: '#workshop_item_hover { display: none !important; }' });
+    await page.waitForSelector('.wshs-collection-sizes', { timeout: 30000 });
+    await page.waitForFunction(() => document.querySelector('.wshs-collection-sizes').getAttribute('aria-busy') === 'false', { timeout: 30000 });
     await wait(1200);
     console.log('collection mock', JSON.stringify(await page.evaluate(mockCollectionSubscriptions, 3)));
     await page.evaluate(() => window.scrollTo(0, 0));
-    // The cursor rests over the hero banner, away from rows and scrolling panes.
-    const rest = await page.evaluate(() => { const r = document.querySelector('.wshs-design-hero').getBoundingClientRect(); return { x: r.left + r.width * 0.62, y: r.top + r.height * 0.55 }; });
-    await page.mouse.move(rest.x, rest.y);
+    await page.mouse.move(MARGIN_X, 450);
     await wait(400);
 
     const recorder = await page.screencast({ path: webm });
-    // 1. The redesigned page: hero, account actions, sizes and description.
-    await wait(1800);
-    // 2. Down to the item count and the filter toolbar.
-    const toList = await page.evaluate(() => document.querySelector('.wshs-design-browsing').getBoundingClientRect().top + window.scrollY - 90);
-    await scrollPage(page, toList, 30);
-    await wait(700);
-    const side = await page.evaluate(() => { const r = document.querySelector('.wshs-design-sidebar').getBoundingClientRect(); return { x: r.left + r.width / 2, y: Math.min(r.bottom - 30, 520) }; });
-    await page.mouse.move(side.x, side.y, { steps: 12 });
-    // 3. Hide Subscribed: the subscribed items leave the list and the count.
+    await wait(600);
+    // Scroll down to the collection sizes, the controls and the item list.
+    const target = await page.evaluate(() => {
+        const c = document.querySelector('.wshs-collection-summary');
+        return c.getBoundingClientRect().top + window.scrollY - 90;
+    });
+    await smoothScroll(page, target, 45);
+    await wait(1000);
+    // 1. Hide Subscribed: the subscribed (checked) items disappear.
+    await page.mouse.move(MARGIN_X, (await center(page, '.subscribeCollection')).y, { steps: 10 });
     await clickOn(page, HIDE_SUBSCRIBED, 20);
-    await page.mouse.move(side.x, side.y, { steps: 12 });
-    await wait(1300);
-    // 4. 5 Stars Only.
-    await clickOn(page, '.star-filter-button', 18);
-    await wait(600);
-    await moveTo(page, '.star-option[data-stars="4"]', 12);
-    await wait(200);
-    await clickOn(page, '.star-option[data-stars="5"]', 8);
-    await page.mouse.move(side.x, side.y, { steps: 12 });
-    await wait(1300);
-    // 5. 100+ Ratings.
-    await clickOn(page, '.ratings-filter-button', 18);
-    await wait(600);
-    await moveTo(page, '[data-ratings="50"]', 12);
-    await wait(200);
-    await clickOn(page, '[data-ratings="100"]', 8);
-    await page.mouse.move(side.x, side.y, { steps: 12 });
+    await wait(1600);
+    // 2. 5 Stars Only: the 4-star items disappear.
+    const star = await center(page, '.star-filter-button');
+    await clickOn(page, '.star-filter-button', 20);
+    await wait(700);
+    await moveTo(page, '.star-option[data-stars="4"]', 15);
+    await wait(250);
+    await clickOn(page, '.star-option[data-stars="5"]', 10);
+    // Leave the item list before Steam's hover preview opens.
+    await page.mouse.move(MARGIN_X, star.y - 40, { steps: 8 });
     await wait(1500);
-    // 6. A long list: Back to top floats over it while scrolling.
-    await scrollPage(page, 5200, 26);
-    await wait(900);
-    // 7. Back to top returns to the page header and the filtered size.
-    await clickOn(page, '.wshs-design-back-to-top', 22);
-    await wait(2400);
-    await page.mouse.move(rest.x, rest.y, { steps: 12 });
+    // 3. 100+ Ratings: After filters drops again.
+    await clickOn(page, '.ratings-filter-button', 15);
+    await wait(700);
+    await moveTo(page, '[data-ratings="50"]', 15);
+    await wait(250);
+    await clickOn(page, '[data-ratings="100"]', 10);
+    await page.mouse.move(MARGIN_X, star.y - 40, { steps: 8 });
+    await wait(1800);
+    // Down the right margin.
+    await page.mouse.move(MARGIN_X, 600, { steps: 15 });
+    await smoothScroll(page, 900, 40);
     await wait(1200);
     await recorder.stop();
 }
@@ -399,12 +391,12 @@ async function withBrowser(fn) {
 
 (async () => {
     fs.mkdirSync(OUT, { recursive: true });
-    // The collection uses the full-width layout; 1000px at 10 fps keeps it
-    // under GitHub's 10 MB limit.
+    // The collection crop keeps the whole page column (header, logo, sidebar)
+    // with a little margin; 10 fps keeps it under GitHub's 10 MB limit.
     const jobs = [
         ['workshop', recordWorkshop, null, 1200, GIF_FPS],
         ['saved-filters', recordSavedFilters, null, 1200, GIF_FPS],
-        ['collection', recordCollection, null, 1000, 10]
+        ['collection', recordCollection, '1000:900:300:0', 1000, 10]
     ];
     const onlyAt = process.argv.indexOf('--only');
     const only = onlyAt === -1 ? null : process.argv[onlyAt + 1];

@@ -2,14 +2,10 @@
 // CSS owns both rows, so labels and filter results cannot change their widths.
 (function () {
     'use strict';
-    if (!/\/sharedfiles\/filedetails\/?$/.test(location.pathname)) return;
     function sync() {
         var wrapper = document.querySelector('.wshs-collection-controls');
         var bar = wrapper && wrapper.closest('.subscribeCollection');
         if (!bar || !wrapper.querySelector('.ratings-filter-button')) return;
-        var heading = document.querySelector('.wshs-collection-filter-heading');
-        var reset = document.querySelector('.wshs-collection-reset');
-        if (heading && reset && reset.parentElement !== heading) heading.appendChild(reset);
         if (bar.classList.contains('wshs-six-controls')) return;
         bar.classList.add('wshs-six-controls');
         wrapper.classList.remove('wshs-row-aligned');

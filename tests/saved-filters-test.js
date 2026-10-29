@@ -14,7 +14,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const puppeteer = require('../perf/node_modules/puppeteer-core');
-const { closeBrowser, clickTitleWord, setWordMode, installFrameSampler } = require('./browser-helpers');
+const { closeBrowser, clickTitleWord, setWordMode } = require('./browser-helpers');
 
 const args = process.argv.slice(2);
 const arg = (name, def) => {
@@ -43,10 +43,8 @@ function copyExtension() {
     const manifest = JSON.parse(fs.readFileSync(path.join(EXT_SRC, 'manifest.json'), 'utf8'));
     if (FIREFOX) {
         manifest.browser_specific_settings = JSON.parse(fs.readFileSync(path.join(EXT_SRC, 'dist/firefox/manifest.json'), 'utf8')).browser_specific_settings;
-        manifest.background = { scripts: ['api-config.js', 'api-data.js', 'steam-api.js'] };
     }
     const files = new Set(['manifest.json', ...Object.values(manifest.icons || {})]);
-    ['steam-api.js','options.html','options.css','options.js','api-config.js','api-data.js'].forEach(f=>files.add(f));
     for (const script of manifest.content_scripts) {
         for (const f of [...(script.js || []), ...(script.css || [])]) files.add(f);
     }
@@ -135,7 +133,6 @@ async function shot(page, name) {
 }
 
 async function samplePickerLeave(page, authorHref) {
-    await installFrameSampler(page);
     await page.evaluate(href => {
         const range = !href && window.__wshsTestWordRange.cloneRange();
         const anchor = href && [...document.querySelectorAll('a[href]')].find(a=>a.getAttribute('href')===href);
@@ -155,7 +152,7 @@ async function samplePickerLeave(page, authorHref) {
                 const y=href?a.top+(a.height-p.height)/2:preview.bottom-p.height-6;
                 samples.push({anchorY:a.top,error:Math.max(Math.abs(p.left-x),Math.abs(p.top-y))});
             }
-            if(performance.now()<until)__wshsAfterFrame(sample);
+            if(performance.now()<until)requestAnimationFrame(sample);
         }
         sample();
     },authorHref||null);
@@ -212,7 +209,7 @@ async function firefoxBaseline() {
 
         // References straight from Steam, before any filter is saved.
         const refBase = await referenceCount(page, '');
-        const refHide = refBase; // Local exclusions preserve Steam's pagination/count.
+        const refHide = await referenceCount(page, '-"' + PHRASE + '"');
         const refOnly = await referenceCount(page, '"' + PHRASE + '"');
         console.log('references: base=' + refBase + ' hide=' + refHide + ' only=' + refOnly);
 
@@ -238,12 +235,12 @@ async function firefoxBaseline() {
         await page.click('.wshs-sf-help');
         check('help explains title-only matches and the controls',await page.evaluate(()=>{
             const p=document.querySelector('.wshs-sf-help-panel');
-            return !p.hidden&&/whole words in titles/.test(p.textContent)&&/Click again to disable/.test(p.textContent)&&p.querySelectorAll('p').length===4&&p.textContent.split(/\s+/).length<60;
+            return !p.hidden&&/mod titles only/.test(p.textContent)&&/turn that filter off/.test(p.textContent)&&/separately for each game/.test(p.textContent);
         }));
         await page.keyboard.press('Escape');
         check('Escape closes help',await page.$eval('.wshs-sf-help-panel',p=>p.hidden));
 
-        // 2. Exclusions check local titles and leave Steam's count unchanged.
+        // 2. Adding a phrase hides matches through Steam's search.
         const sortLabel = () => page.evaluate(() => {
             const b = [...document.querySelectorAll('div[role="button"][tabindex]')]
                 .find(x => x.querySelector('svg[viewBox="0 0 32 18"]'));
@@ -255,7 +252,7 @@ async function firefoxBaseline() {
         await page.click('.wshs-sf-save');
         await waitForRefetch(page, before, 'add phrase',refHide);
         let n = await count(page);
-        check('local exclusion preserves Steam result count', near(n, refHide), 'count=' + n + ' expected~' + refHide);
+        check('added phrase hides matches', near(n, refHide), 'count=' + n + ' expected~' + refHide);
         check('excluded phrase is absent from visible titles',await page.evaluate(phrase=>![...document.querySelectorAll('#CommunityTemplate a[href*="sharedfiles/filedetails/?id="]')].filter(a=>!a.querySelector('img')&&a.offsetParent!==null).some(a=>a.textContent.toLowerCase().includes(phrase)),PHRASE));
         check('new row is in "-" state', (await rowCount(page)) === 1);
         let box = await searchBoxState(page);
@@ -293,7 +290,7 @@ async function firefoxBaseline() {
             await page.waitForSelector('.wshs-sf-list > *', { timeout: 15000 }).catch(() => null);
             await waitForRefetch(page, 0, 'first load',refHide);
             n = await count(page);
-            check('local filter survives reload '+reload+' without altering Steam count', near(n, refHide), 'count=' + n + ' expected~' + refHide);
+            check('filter survives reload '+reload+' and applies on first load', near(n, refHide), 'count=' + n + ' expected~' + refHide);
             box = await searchBoxState(page);
             check('search box still clean after reload '+reload, box.value !== null && box.value.trim() === '' && !box.blankChip, JSON.stringify(box.value));
         }
