@@ -52,15 +52,25 @@
         var type = requestType(input, init);
         if (type !== 'routeAction' && type !== 'routeData') return null;
         var url = new URL(input instanceof Request ? input.url : String(input), window.location.href);
-        if (!/\/workshop\/browse\/?$/.test(url.pathname)) return null;
+        if (url.origin !== window.location.origin || !/\/workshop\/browse\/?$/.test(url.pathname)) return null;
+        // A native query has its own field scope and boolean grammar. There is
+        // no per-clause field scope, so appending saved title-only phrases could
+        // change both OR precedence and Description Only semantics. Leave that
+        // query entirely to Steam; saved rules still run on its returned cards.
+        var body = null, args = null;
+        if (type === 'routeAction' && init && typeof init.body === 'string') {
+            body = JSON.parse(init.body);
+            args = Array.isArray(body) ? body : [body];
+        }
+        var texts = args && args.filter(function (arg) { return arg && typeof arg.search_text === 'string'; });
+        if (texts && texts.length ? texts.some(function (arg) { return arg.search_text.trim(); }) : (url.searchParams.get('searchtext') || '').trim()) return null;
+        if (type === 'routeAction' && (!texts || !texts.length)) return null;
         url.searchParams.set('searchtext', withTerms(url.searchParams.get('searchtext'), terms));
         // Steam's native targets: 1 = titles only; 0 = titles + descriptions.
         var target = document.documentElement.getAttribute(SCOPE_ATTR) === '1' ? 0 : 1;
         url.searchParams.set('search_text_target', String(target));
         var nextInit = init;
         if (init && typeof init.body === 'string' && init.body.indexOf('"search_text"') !== -1) {
-            var body = JSON.parse(init.body);
-            var args = Array.isArray(body) ? body : [body];
             for (var i = 0; i < args.length; i++) {
                 if (args[i] && typeof args[i].search_text === 'string') {
                     args[i].search_text = withTerms(args[i].search_text, terms);

@@ -8,11 +8,17 @@
 //   saved-filters.gif  RimWorld browse page: save a keyword from the sidebar,
 //                      then hide a creator from the card picker (with its
 //                      2.5-second undo window)
-//   collection.gif     "Genesis Mod Pack" (RimWorld, mixed 4/5-star items):
-//                      Hide Subscribed, 5 Stars Only and 100+ Ratings, with the
-//                      Total / After filters sizes updating, then scroll the list
+//   collection.gif     "Genesis Mod Pack" (RimWorld, mixed 4/5-star items) in the
+//                      redesigned layout: Hide Subscribed, 5 Stars Only and
+//                      100+ Ratings with the shown count updating, a long scroll
+//                      under the floating Back to top, then back to the sizes
 //
-// Usage: node record.js [--convert-only] [--only workshop|saved-filters|collection]
+//   settings.gif       The settings popup over a RimWorld browse page: Compact,
+//                      sidebar on the right, pinned sidebar and filter bar
+//   collections-browse.gif  RimWorld Collections browse: Steam's hover preview,
+//                      then 5 Stars Only
+//
+// Usage: node record.js [--convert-only] [--only workshop|saved-filters|collection|settings|collections-browse]
 //   (writes to ../out/readme-gifs/; needs ffmpeg on PATH; --convert-only
 //   re-encodes the existing .webm recordings without opening Steam)
 //
@@ -36,33 +42,23 @@ const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const EXT_SRC = path.resolve(__dirname, '..', '..');
 const OUT = path.resolve(__dirname, '..', 'out', 'readme-gifs');
 
-const VIEWPORT = { width: 1600, height: 900 };
+// 1920x1080: below about 1700px the sidebar leaves four card columns and the
+// Workshop toolbar wraps its fifth control (sort) onto a second row.
+const VIEWPORT = { width: 1920, height: 1080 };
 const GIF_FPS = 12;
-// The collection page sits in a 950px column (x 325-1275 at a 1600px
-// viewport); the cursor rests in the margin just right of it, inside the crop.
-const MARGIN_X = 1288;
 
 const WORKSHOP_URL = 'https://steamcommunity.com/workshop/browse/?appid=108600&browsesort=trend&section=readytouseitems';
-const COLLECTION_URL = 'https://steamcommunity.com/sharedfiles/filedetails/?id=3798004429';
+const COLLECTION_URL = 'https://steamcommunity.com/sharedfiles/filedetails/?id=3521297585';
 const SAVED_FILTERS_URL = 'https://steamcommunity.com/workshop/browse/?appid=294100&browsesort=trend&section=readytouseitems';
 
-// The files manifest.json lists, the same set build.js packages.
-function extensionFiles() {
-    const manifest = JSON.parse(fs.readFileSync(path.join(EXT_SRC, 'manifest.json'), 'utf8'));
-    const files = new Set(['manifest.json', ...Object.values(manifest.icons || {})]);
-    for (const script of manifest.content_scripts || []) {
-        for (const f of [...(script.js || []), ...(script.css || [])]) files.add(f);
-    }
-    return [...files];
-}
-
+// Records the exact Chrome package build.js produces (background worker, popup,
+// options and content scripts), rebuilt first so it matches the sources.
 function copyExtension() {
+    execFileSync(process.execPath, [path.join(EXT_SRC, 'build.js')], { cwd: EXT_SRC, stdio: 'ignore' });
+    const built = path.join(EXT_SRC, 'dist', 'chrome');
     // Chrome's Extensions.loadUnpacked rejects paths containing spaces.
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wshs-gif-'));
-    for (const file of extensionFiles()) {
-        fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
-        fs.copyFileSync(path.join(EXT_SRC, file), path.join(dir, file));
-    }
+    fs.cpSync(built, dir, { recursive: true });
     return dir;
 }
 
@@ -153,7 +149,7 @@ function mockCollectionSubscriptions(count) {
     let marked = 0;
     for (let i = 1; i < items.length && marked < count; i += 2) {
         if (stars(items[i]) < 5) continue;
-        const btn = items[i].querySelector('a.general_btn.subscribe');
+        const btn = items[i].querySelector('.subscriptionControls .general_btn, a.general_btn.subscribe');
         if (btn) {
             btn.classList.add('toggled');
             marked += 1;
@@ -184,6 +180,16 @@ async function clickOn(page, target, steps) {
     const p = await moveTo(page, target, steps);
     await wait(250);
     await page.mouse.click(p.x, p.y);
+}
+
+// Scrolls the page itself; wheel events would scroll whatever scrollable pane
+// (author list, pinned sidebar) sits under the cursor.
+async function scrollPage(page, dy, steps) {
+    const n = steps || 30;
+    for (let i = 0; i < n; i++) {
+        await page.evaluate(d => window.scrollBy(0, d), dy / n);
+        await wait(25);
+    }
 }
 
 async function smoothScroll(page, dy, steps) {
@@ -244,57 +250,66 @@ async function recordWorkshop(page, webm) {
     await clickOn(page, TOP_RATED, 15);
     await wait(500);
     await page.keyboard.press('Escape');
-    const sort = await center(page, SORT_BUTTON);
-    await page.mouse.move(sort.x - 200, sort.y - 70, { steps: 10 });
-    await page.mouse.click(sort.x - 200, sort.y - 70);
+    // Close the sort menu on plain heading text (the sidebar's search settings
+    // gear sits where an offset click used to land).
+    const heading = await center(page, 'fn:() => { const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); ' +
+        'while (w.nextNode()) if (/^\\s*Browsing:/.test(w.currentNode.nodeValue)) return w.currentNode.parentElement; }');
+    await page.mouse.move(heading.x, heading.y, { steps: 10 });
+    await page.mouse.click(heading.x, heading.y);
     await wait(2200);
     await recorder.stop();
 }
 
 async function recordCollection(page, webm) {
     await page.goto(COLLECTION_URL, { waitUntil: 'load', timeout: 60000 });
-    await page.waitForSelector('.wshs-collection-sizes', { timeout: 30000 });
-    await page.waitForFunction(() => document.querySelector('.wshs-collection-sizes').getAttribute('aria-busy') === 'false', { timeout: 30000 });
+    await page.waitForSelector('.wshs-design-items', { timeout: 30000 });
+    await page.waitForFunction(() => document.querySelector('.wshs-collection-sizes')?.getAttribute('aria-busy') === 'false', { timeout: 30000 });
+    // Steam's item preview pops up beside hovered rows; keep it out of the GIF.
+    await page.addStyleTag({ content: '#workshop_item_hover { display: none !important; }' });
     await wait(1200);
     console.log('collection mock', JSON.stringify(await page.evaluate(mockCollectionSubscriptions, 3)));
     await page.evaluate(() => window.scrollTo(0, 0));
-    await page.mouse.move(MARGIN_X, 450);
+    // The cursor rests over the hero banner, away from rows and scrolling panes.
+    const rest = await page.evaluate(() => { const r = document.querySelector('.wshs-design-hero').getBoundingClientRect(); return { x: r.left + r.width * 0.62, y: r.top + r.height * 0.55 }; });
+    await page.mouse.move(rest.x, rest.y);
     await wait(400);
 
     const recorder = await page.screencast({ path: webm });
-    await wait(600);
-    // Scroll down to the collection sizes, the controls and the item list.
-    const target = await page.evaluate(() => {
-        const c = document.querySelector('.wshs-collection-summary');
-        return c.getBoundingClientRect().top + window.scrollY - 90;
-    });
-    await smoothScroll(page, target, 45);
-    await wait(1000);
-    // 1. Hide Subscribed: the subscribed (checked) items disappear.
-    await page.mouse.move(MARGIN_X, (await center(page, '.subscribeCollection')).y, { steps: 10 });
-    await clickOn(page, HIDE_SUBSCRIBED, 20);
-    await wait(1600);
-    // 2. 5 Stars Only: the 4-star items disappear.
-    const star = await center(page, '.star-filter-button');
-    await clickOn(page, '.star-filter-button', 20);
-    await wait(700);
-    await moveTo(page, '.star-option[data-stars="4"]', 15);
-    await wait(250);
-    await clickOn(page, '.star-option[data-stars="5"]', 10);
-    // Leave the item list before Steam's hover preview opens.
-    await page.mouse.move(MARGIN_X, star.y - 40, { steps: 8 });
-    await wait(1500);
-    // 3. 100+ Ratings: After filters drops again.
-    await clickOn(page, '.ratings-filter-button', 15);
-    await wait(700);
-    await moveTo(page, '[data-ratings="50"]', 15);
-    await wait(250);
-    await clickOn(page, '[data-ratings="100"]', 10);
-    await page.mouse.move(MARGIN_X, star.y - 40, { steps: 8 });
+    // 1. The redesigned page: hero, account actions, sizes and description.
     await wait(1800);
-    // Down the right margin.
-    await page.mouse.move(MARGIN_X, 600, { steps: 15 });
-    await smoothScroll(page, 900, 40);
+    // 2. Down to the item count and the filter toolbar.
+    const toList = await page.evaluate(() => document.querySelector('.wshs-design-browsing').getBoundingClientRect().top + window.scrollY - 90);
+    await scrollPage(page, toList, 30);
+    await wait(700);
+    const side = await page.evaluate(() => { const r = document.querySelector('.wshs-design-sidebar').getBoundingClientRect(); return { x: r.left + r.width / 2, y: Math.min(r.bottom - 30, 520) }; });
+    await page.mouse.move(side.x, side.y, { steps: 12 });
+    // 3. Hide Subscribed: the subscribed items leave the list and the count.
+    await clickOn(page, HIDE_SUBSCRIBED, 20);
+    await page.mouse.move(side.x, side.y, { steps: 12 });
+    await wait(1300);
+    // 4. 5 Stars Only.
+    await clickOn(page, '.star-filter-button', 18);
+    await wait(600);
+    await moveTo(page, '.star-option[data-stars="4"]', 12);
+    await wait(200);
+    await clickOn(page, '.star-option[data-stars="5"]', 8);
+    await page.mouse.move(side.x, side.y, { steps: 12 });
+    await wait(1300);
+    // 5. 100+ Ratings.
+    await clickOn(page, '.ratings-filter-button', 18);
+    await wait(600);
+    await moveTo(page, '[data-ratings="50"]', 12);
+    await wait(200);
+    await clickOn(page, '[data-ratings="100"]', 8);
+    await page.mouse.move(side.x, side.y, { steps: 12 });
+    await wait(1500);
+    // 6. A long list: Back to top floats over it while scrolling.
+    await scrollPage(page, 5200, 26);
+    await wait(900);
+    // 7. Back to top returns to the page header and the filtered size.
+    await clickOn(page, '.wshs-design-back-to-top', 22);
+    await wait(2400);
+    await page.mouse.move(rest.x, rest.y, { steps: 12 });
     await wait(1200);
     await recorder.stop();
 }
@@ -353,6 +368,113 @@ async function recordSavedFilters(page, webm) {
     await recorder.stop();
 }
 
+const COLLECTIONS_BROWSE_URL = 'https://steamcommunity.com/workshop/browse/?appid=294100&section=collections&browsesort=trend&days=365';
+
+// Settings popup over a Workshop page. The popup is the extension's real
+// popup.html, recorded as its own page in the same browser and composited
+// top-right (where Chrome opens it) by composeSettings().
+async function recordSettings(page, webm, browser) {
+    await page.goto(SAVED_FILTERS_URL, { waitUntil: 'load', timeout: 60000 });
+    await page.waitForSelector('.wshs-sf-input', { timeout: 30000 });
+    await wait(1500);
+    await page.evaluate(() => {
+        const c = document.querySelector('.wshs-injected-controls');
+        window.scrollTo(0, c.getBoundingClientRect().top + window.scrollY - 170);
+    });
+    const worker = await browser.waitForTarget(t => t.type() === 'service_worker' && t.url().startsWith('chrome-extension://'), { timeout: 20000 });
+    // A separate window, not a tab: background tabs stop painting, and both
+    // pages must record at once.
+    const cdp = await browser.target().createCDPSession();
+    const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank', newWindow: true });
+    const popup = await (await browser.waitForTarget(t => t._targetId === targetId)).page();
+    await popup.setViewport({ width: 330, height: 600, deviceScaleFactor: 1.4 });
+    await popup.goto('chrome-extension://' + new URL(worker.url()).host + '/popup.html', { waitUntil: 'load' });
+    await popup.waitForFunction(() => !document.getElementById('density-settings').disabled, { timeout: 10000 });
+    const height = await popup.evaluate(() => Math.ceil(document.body.getBoundingClientRect().height));
+    await popup.setViewport({ width: 330, height, deviceScaleFactor: 1.4 });
+    await popup.evaluate(cursorOverlay);
+    await popup.mouse.move(300, 40);
+    // The popup has the only cursor; the page reacts without one.
+    await page.evaluate(() => document.getElementById('__rec-cursor').remove());
+    await wait(400);
+
+    const popupWebm = webm.replace(/\.webm$/, '-popup.webm');
+    const pageWebm = webm.replace(/\.webm$/, '-page.webm');
+    const recorders = [await page.screencast({ path: pageWebm }), await popup.screencast({ path: popupWebm })];
+    await wait(1200);
+    // 1. Compact: up to six cards per row.
+    await clickOn(popup, 'label[for="density-compact"]', 25);
+    await wait(2000);
+    // 2. Sidebar on the right.
+    await clickOn(popup, 'label[for="position-right"]', 20);
+    await wait(2000);
+    // 3. Pin the sidebar and the filter bar, then scroll the results.
+    await clickOn(popup, '#pinned-sidebar', 20);
+    await wait(500);
+    await clickOn(popup, '#pinned-workshop-bar', 12);
+    await wait(700);
+    await scrollPage(page, 600, 30);
+    await wait(1600);
+    await scrollPage(page, -600, 25);
+    await wait(700);
+    // 4. Back to Comfortable.
+    await clickOn(popup, 'label[for="density-comfortable"]', 20);
+    await wait(1800);
+    for (const r of recorders) await r.stop();
+    composeSettings(pageWebm, popupWebm, webm);
+}
+
+// Puts the popup recording beside the page recording, not over it, so the
+// right-hand sidebar stays visible. The page is cropped to Steam's content
+// column (x 100-1820) and the popup gets an accent edge.
+function composeSettings(pageWebm, popupWebm, out) {
+    execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', pageWebm, '-i', popupWebm, '-filter_complex',
+        '[0:v]crop=1720:1080:100:0,pad=iw+520:ih:0:0:color=0x1b2838[g];' +
+        '[1:v]scale=462:-2:flags=lanczos,pad=iw+4:ih+4:2:2:color=0x1a9fff[p];' +
+        '[g][p]overlay=W-w-28:(H-h)/2:eof_action=repeat',
+        '-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '30', out]);
+}
+
+// Collections browse: Steam's hover preview leaves the count alone, then
+// 5 Stars Only narrows the collections on the page.
+async function recordCollectionsBrowse(page, webm) {
+    await page.goto(COLLECTIONS_BROWSE_URL, { waitUntil: 'load', timeout: 60000 });
+    await page.waitForSelector('.wshs-collection-browse-card', { timeout: 30000 });
+    await page.waitForSelector('.star-filter-button', { timeout: 30000 });
+    await wait(1500);
+    await page.evaluate(() => {
+        const c = document.querySelector('.wshs-injected-controls');
+        window.scrollTo(0, c.getBoundingClientRect().top + window.scrollY - 170);
+    });
+    const rest = await page.evaluate(() => {
+        const r = document.querySelector('.wshs-injected-controls').getBoundingClientRect();
+        return { x: r.left + r.width * 0.3, y: r.top - 40 };
+    });
+    await page.mouse.move(rest.x, rest.y);
+    await wait(400);
+
+    const recorder = await page.screencast({ path: webm });
+    await wait(1200);
+    // 1. Hover a collection: Steam's preview lists its items; the count stays.
+    await page.evaluate(() => {
+        const card = document.querySelectorAll('.wshs-collection-browse-card')[1];
+        card.querySelector('img').setAttribute('data-rec-preview', 'true');
+    });
+    await moveTo(page, '[data-rec-preview]', 25);
+    await wait(2200);
+    await page.mouse.move(rest.x, rest.y, { steps: 15 });
+    await wait(800);
+    // 2. 5 Stars Only.
+    await clickOn(page, '.star-filter-button', 20);
+    await wait(600);
+    await moveTo(page, '.star-option[data-stars="4"]', 12);
+    await wait(200);
+    await clickOn(page, '.star-option[data-stars="5"]', 8);
+    await page.mouse.move(rest.x, rest.y, { steps: 10 });
+    await wait(2400);
+    await recorder.stop();
+}
+
 // GitHub rejects README images over 10 MB. Static stretches are dropped with
 // mpdecimate (GIF frames then carry longer delays), the palette is 128
 // colors and Bayer dithering compresses far better than error diffusion.
@@ -382,7 +504,7 @@ async function withBrowser(fn) {
         const page = await browser.newPage();
         await page.setViewport(VIEWPORT);
         await page.evaluateOnNewDocument(cursorOverlay);
-        await fn(page);
+        await fn(page, browser);
     } finally {
         await browser.close();
         fs.rmSync(extDir, { recursive: true, force: true });
@@ -391,19 +513,21 @@ async function withBrowser(fn) {
 
 (async () => {
     fs.mkdirSync(OUT, { recursive: true });
-    // The collection crop keeps the whole page column (header, logo, sidebar)
-    // with a little margin; 10 fps keeps it under GitHub's 10 MB limit.
+    // The collection uses the full-width layout; 1000px at 10 fps keeps it
+    // under GitHub's 10 MB limit.
     const jobs = [
-        ['workshop', recordWorkshop, null, 1200, GIF_FPS],
-        ['saved-filters', recordSavedFilters, null, 1200, GIF_FPS],
-        ['collection', recordCollection, '1000:900:300:0', 1000, 10]
+        ['workshop', recordWorkshop, null, 1280, GIF_FPS],
+        ['saved-filters', recordSavedFilters, null, 1280, GIF_FPS],
+        ['collection', recordCollection, null, 1000, 9],
+        ['settings', recordSettings, null, 1280, 10],
+        ['collections-browse', recordCollectionsBrowse, null, 1280, GIF_FPS]
     ];
     const onlyAt = process.argv.indexOf('--only');
     const only = onlyAt === -1 ? null : process.argv[onlyAt + 1];
     for (const [name, fn, crop, width, fps] of jobs) {
         if (only && name !== only) continue;
         const webm = path.join(OUT, name + '.webm');
-        if (!process.argv.includes('--convert-only')) await withBrowser(page => fn(page, webm));
+        if (!process.argv.includes('--convert-only')) await withBrowser((page, browser) => fn(page, webm, browser));
         toGif(webm, path.join(OUT, name + '.gif'), crop, width, fps);
     }
 })();

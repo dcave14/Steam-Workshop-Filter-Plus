@@ -9,20 +9,20 @@
 //
 // Logged-out capture: "Hide Subscribed" can be toggled but has nothing to
 // hide without a Steam session, so the shots show saved filters, the rating
-// menus and the collection sizes instead of hidden items.
+// menus, the redesigned collection page and the Compact layout instead.
 
 const fs = require('fs');
 const path = require('path');
-const { launch, closeBrowser, wait, clickTitleWord, setWordMode } = require('../../tests/browser-helpers');
+const { launch, closeBrowser, extensionWorld, wait, clickTitleWord, setWordMode } = require('../../tests/browser-helpers');
 
 const OUT = path.resolve(__dirname, '..', 'out', 'store-assets', 'raw');
 
 const BROWSE_URL = 'https://steamcommunity.com/workshop/browse/?appid=294100&browsesort=trend&section=readytouseitems';
 // An English RimWorld collection, so the store shots read clearly.
-const COLLECTION_URL = 'https://steamcommunity.com/sharedfiles/filedetails/?id=3811511129';
+const COLLECTION_URL = 'https://steamcommunity.com/sharedfiles/filedetails/?id=3521297585';
 
 // Shots are taken at 2x so compose.js can scale them into a frame crisply.
-const VIEWPORT = { width: 1600, height: 1000, deviceScaleFactor: 2 };
+const VIEWPORT = { width: 1920, height: 1200, deviceScaleFactor: 2 };
 
 const GRID_AUTHOR = '#CommunityTemplate a[href*="/myworkshopfiles"]';
 
@@ -136,51 +136,50 @@ async function captureBrowse(page) {
     await page.mouse.move(2, 2);
     await shot(page, 'browse-filtered');
 
-    // Reset stored choices so the collection shots start clean.
-    await page.evaluate(() => document.querySelector('.hide-subscribed-button:not(.star-filter-button):not(.ratings-filter-button)').click());
+    // Compact layout: up to six cards per row.
+    await page.$$eval('.wshs-sf-delete', es => es.forEach(e => e.click()));
     await choose(page, '.ratings-filter-button', '[data-ratings="0"]');
     await choose(page, '.star-filter-button', '.star-option[data-stars="0"]');
+    await page.evaluate(() => document.querySelector('.hide-subscribed-button:not(.star-filter-button):not(.ratings-filter-button)').click());
+    const world = await extensionWorld(page);
+    await world("chrome.storage.local.set({layoutDensity:'compact'})");
+    await wait(1500);
+    await scrollTo(page, '.wshs-injected-controls', 110);
+    await shot(page, 'browse-compact');
+    await world("chrome.storage.local.set({layoutDensity:'comfortable'})");
+    await wait(800);
 }
 
 async function captureCollection(page) {
     await page.goto(COLLECTION_URL, { waitUntil: 'load', timeout: 60000 });
-    await page.waitForSelector('.wshs-collection-sizes', { timeout: 30000 });
+    await page.waitForSelector('.wshs-design-items', { timeout: 30000 });
     // Steam's item preview pops up beside any hovered row; keep it out of the shots.
     await page.addStyleTag({ content: '#workshop_item_hover { display: none !important; }' });
     await page.waitForFunction(() => document.querySelector('.wshs-collection-sizes')?.getAttribute('aria-busy') === 'false', { timeout: 30000 });
-    await wait(1000);
-    await scrollTo(page, '.wshs-collection-summary', 120);
+    await page.evaluate(() => document.fonts.ready);
+    await wait(1200);
+    // The redesigned page: hero, account actions, sizes, description, authors.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.mouse.move(2, 2);
+    await wait(500);
     await shot(page, 'collection');
 
-    // Stars and a rating threshold: After filters drops below Total.
+    // Stars and a rating threshold: the shown count and After filters drop.
     await choose(page, '.ratings-filter-button', '[data-ratings="100"]');
     await choose(page, '.star-filter-button', '.star-option[data-stars="5"]');
-    await scrollTo(page, '.wshs-collection-summary', 120);
+    await scrollTo(page, '.wshs-design-stats', 16);
     await shot(page, 'collection-sizes');
 
-    // Saved filters on the collection, with the picker on a creator.
-    await addKeyword(page, 'retexture');
-    await scrollTo(page, '.wshs-collection-summary', 120);
-    const author = await page.$$('.collectionItem:not(.wshs-filtered):not(.wshs-ratings-filtered) .workshopItemAuthorName a');
-    for (const a of author) {
-        const ok = await a.evaluate(el => {
-            const r = el.getBoundingClientRect();
-            return r.width > 0 && r.top > 380 && r.bottom < window.innerHeight - 80;
-        });
-        if (ok) { await a.hover(); break; }
-    }
-    await wait(500);
-    await shot(page, 'collection-saved');
-
-    await page.$$eval('.wshs-sf-delete', es => es.forEach(e => e.click()));
     await choose(page, '.ratings-filter-button', '[data-ratings="0"]');
     await choose(page, '.star-filter-button', '.star-option[data-stars="0"]');
+
 }
 
 (async () => {
     fs.mkdirSync(OUT, { recursive: true });
     const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : null;
-    const browser = await launch();
+    // The shared data service supplies the collection sizes and rating counts.
+    const browser = await launch(undefined, { useConfiguredService: true });
     try {
         const page = await browser.newPage();
         await page.setViewport(VIEWPORT);

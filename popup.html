@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Steam Workshop Filter Plus</title><link rel="stylesheet" href="popup.css"><script src="popup.js" defer></script></head>
+<body>
+  <header><img src="icons/icon-48.png" width="48" height="48" alt=""><h1>Steam Workshop<br>Filter Plus</h1></header>
+  <main>
+    <h2>Settings</h2>
+    <label class="pin-row" for="pinned-sidebar"><span>Pin sidebars</span><input type="checkbox" role="switch" id="pinned-sidebar" disabled><span class="switch" aria-hidden="true"></span></label>
+    <label class="pin-row" for="pinned-workshop-bar"><span>Pin Workshop filter bar</span><input type="checkbox" role="switch" id="pinned-workshop-bar" disabled><span class="switch" aria-hidden="true"></span></label>
+    <label class="pin-row" for="pinned-collections"><span>Pin collection filters</span><input type="checkbox" role="switch" id="pinned-collections" disabled><span class="switch" aria-hidden="true"></span></label>
+    <p class="hint">Sidebar pinning and placement apply to Workshop and collections.</p>
+    <fieldset disabled id="position-settings"><legend>Sidebar position</legend><div class="positions"><input type="radio" name="position" id="position-left" value="left"><label for="position-left">Left</label><input type="radio" name="position" id="position-right" value="right"><label for="position-right">Right</label></div></fieldset>
+    <section class="settings-section"><h2>Collections</h2>
+      <label class="pin-row" for="collection-overhaul"><span>Collections overhaul</span><input type="checkbox" role="switch" id="collection-overhaul" disabled><span class="switch" aria-hidden="true"></span></label>
+      <p class="hint">Workshop-style layout. Reloads collection pages when changed.</p>
+    </section>
+    <section class="settings-section"><h2>Card layout</h2>
+      <fieldset disabled id="density-settings"><legend class="sr-only">Card density</legend><div class="positions density"><input type="radio" name="density" id="density-comfortable" value="comfortable"><label for="density-comfortable">Comfortable</label><input type="radio" name="density" id="density-compact" value="compact"><label for="density-compact">Compact</label></div></fieldset>
+      <p class="hint">Compact fits up to six cards across. Comfortable collections fit five.</p>
+    </section>
+    <section class="settings-section"><h2>Motion</h2>
+      <label class="pin-row" for="reduce-motion"><span>Reduce motion</span><input type="checkbox" role="switch" id="reduce-motion" disabled><span class="switch" aria-hidden="true"></span></label>
+      <fieldset disabled id="motion-settings" class="motion-options"><legend class="sr-only">Motion controls</legend>
+        <label><input type="checkbox" id="disable-card-hover">Disable card hover animations</label>
+        <label><input type="checkbox" id="pause-home-carousels">Pause homepage carousels</label>
+        <label><input type="checkbox" id="freeze-animated-previews">Freeze animated previews (GIFs)</label>
+      </fieldset>
+    </section>
+  </main>
+  <footer id="status" role="status">Preferences save automatically.</footer>
+</body></html>

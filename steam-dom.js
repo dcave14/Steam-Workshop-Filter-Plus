@@ -20,6 +20,9 @@
     var LOG_PREFIX = '[WSHS]';
     var ITEM_LINK_SELECTOR = 'a[href*="sharedfiles/filedetails/?id="]';
     var PREVIEW_SELECTOR = '.aspectratio_16x9, .aspectratio_square';
+    // [popover]: Steam's floating card previews (Collections browse) list item
+    // links inside the results grid; they are not results.
+    var NON_RESULT_SELECTOR = 'dialog, [role="dialog"], [aria-modal="true"], [popover], #workshop_item_hover, #global_hover';
     var BATCH_SIZE = 100;
     var REPLAY_COOLDOWN_MS = 15000;
 
@@ -302,14 +305,26 @@
         return match ? match[1] : null;
     }
 
-    function collectPublishedFileIds(node) {
-        var ids = new Set();
-        var links = node.querySelectorAll(ITEM_LINK_SELECTOR);
+    // Only the distinction between zero, one and multiple IDs matters. Build it
+    // once per discovery pass, rather than scanning the shared grid for every
+    // card. An unchanged summary already propagated to every ancestor, so its
+    // climb can stop immediately (including duplicate preview/title links).
+    function summarizeCardAncestors(links, boundary) {
+        var summaries = new WeakMap();
         for (var i = 0; i < links.length; i++) {
+            if (links[i].closest(NON_RESULT_SELECTOR)) continue;
             var id = parsePublishedFileId(links[i].href);
-            if (id) ids.add(id);
+            if (!id) continue;
+            var node = links[i].parentElement;
+            while (node && node !== boundary && node !== document.body && node !== document.documentElement) {
+                var summary = summaries.get(node);
+                if (summary && (summary.multiple || summary.id === id)) break;
+                if (summary) summary.multiple = true;
+                else summaries.set(node, { id: id, multiple: false });
+                node = node.parentElement;
+            }
         }
-        return ids;
+        return summaries;
     }
 
     // Card root = highest ancestor of the item link that still looks like a single
@@ -319,21 +334,20 @@
     // while the candidate still looks like a card, the candidate cannot be told apart
     // from a page-level wrapper (single-card pages), so null is returned and nothing is
     // hidden. The final root is re-validated against the same rule; fail safe.
-    function findCardRoot(link) {
+    function findCardRoot(link, templateRoot, summaries) {
         // Quick View contains linked dependency thumbnails. They are not
         // browse results and must never affect filtering or grid geometry,
         // even while a closed dialog remains mounted in React's tree.
-        if (link.closest('dialog, [role="dialog"], [aria-modal="true"]')) return null;
+        if (link.closest(NON_RESULT_SELECTOR)) return null;
         var id = parsePublishedFileId(link.href);
         if (!id) return null;
-        var templateRoot = document.getElementById('CommunityTemplate') ||
-            document.querySelector('[data-react-nav-root="CommunityTemplate"]');
         var node = link.parentElement;
         var root = null;
         while (node && node !== document.body && node !== document.documentElement && node !== templateRoot) {
-            if (!node.matches(PREVIEW_SELECTOR) && !node.querySelector(PREVIEW_SELECTOR)) break;
-            var ids = collectPublishedFileIds(node);
-            if (ids.size !== 1 || !ids.has(id)) break;
+            var summary = summaries.get(node);
+            if (!summary || summary.multiple || summary.id !== id) break;
+            if (summary.preview === undefined) summary.preview = !!node.querySelector(PREVIEW_SELECTOR);
+            if (!node.matches(PREVIEW_SELECTOR) && !summary.preview) break;
             root = node;
             node = node.parentElement;
         }
@@ -343,26 +357,54 @@
             // whole-page container; hide nothing.
             return null;
         }
-        var rootIds = collectPublishedFileIds(root);
-        if (rootIds.size !== 1 || !rootIds.has(id) || !root.querySelector(PREVIEW_SELECTOR)) {
+        var rootSummary = summaries.get(root);
+        if (rootSummary.multiple || rootSummary.id !== id || !rootSummary.preview) {
             return null;
         }
         return root;
     }
 
+    var cachedCards = null, cachedCardScope = null, cardsDirty = true;
+    function invalidateCards(changes) {
+        if (cardsDirty) return;
+        for (var change of changes) {
+            var target = change.target.nodeType === 1 ? change.target : change.target.parentElement;
+            if (target?.closest(NON_RESULT_SELECTOR)) continue;
+            if (change.type === 'attributes') {
+                if (change.attributeName === 'href' && target.matches('a') || change.attributeName === 'id' && target === cachedCardScope || change.attributeName === 'class' && (target.matches(PREVIEW_SELECTOR) || /aspectratio_/.test(change.oldValue || ''))) { cardsDirty = true; return; }
+                continue;
+            }
+            for (var n of Array.from(change.addedNodes).concat(Array.from(change.removedNodes))) {
+                if (n.nodeType !== 1 || n.closest(NON_RESULT_SELECTOR)) continue;
+                if (n.matches(ITEM_LINK_SELECTOR + ',' + PREVIEW_SELECTOR)) { cardsDirty = true; return; }
+                for (var match of n.querySelectorAll(ITEM_LINK_SELECTOR + ',' + PREVIEW_SELECTOR)) {
+                    if (!match.closest(NON_RESULT_SELECTOR)) { cardsDirty = true; return; }
+                }
+            }
+        }
+    }
+    var cardObserver = new MutationObserver(invalidateCards);
+    cardObserver.observe(document, {childList:true,subtree:true,attributes:true,attributeOldValue:true,attributeFilter:['href','id','class']});
     function enumerateCards() {
+        // Drain synchronous React changes before another extension consumer reads.
+        invalidateCards(cardObserver.takeRecords());
         var scope = document.getElementById('CommunityTemplate') || document;
+        if (!cardsDirty && cachedCards && scope === cachedCardScope) return cachedCards;
         var links = scope.querySelectorAll(ITEM_LINK_SELECTOR);
+        var templateRoot = document.getElementById('CommunityTemplate') ||
+            document.querySelector('[data-react-nav-root="CommunityTemplate"]');
+        var summaries = summarizeCardAncestors(links, templateRoot);
         var cards = [];
         var seen = new Set();
         for (var i = 0; i < links.length; i++) {
             var id = parsePublishedFileId(links[i].href);
             if (!id || seen.has(id)) continue;
-            var root = findCardRoot(links[i]);
+            var root = findCardRoot(links[i], templateRoot, summaries);
             if (!root) continue;
             seen.add(id);
             cards.push({ id: id, root: root });
         }
+        cachedCards = cards; cachedCardScope = scope; cardsDirty = false;
         return cards;
     }
 
@@ -384,10 +426,106 @@
     // cards (still zero after the pass) are skipped. Returns null when no card
     // is measurable. Cards hidden by saved author filters (saved-filters.js,
     // wshs-filtered) get the same treatment.
-    var FILTER_CLASSES = ['hidden-item', 'wshs-filtered', 'wshs-ratings-filtered'];
+    var FILTER_CLASSES = ['hidden-item', 'wshs-filtered', 'wshs-ratings-filtered', 'wshs-review-omit'];
+    var geometryCards = null, geometryParent = null, geometrySharedParent = false;
+    var fallbackGeometry = null;
+    var neutralGeometryWrappers = new WeakMap();
+    function geometryClass(value) {
+        return (value || '').split(/\s+/).filter(function (name) { return name && FILTER_CLASSES.indexOf(name) === -1; }).sort().join(' ');
+    }
+    function transientGeometryNode(node) {
+        if (node.nodeType === 3) return !node.nodeValue.trim();
+        if (node.nodeType !== 1 || node.matches('style,link[rel="stylesheet"]') || node.querySelector('style,link[rel="stylesheet"]')) return false;
+        if (node.matches(NON_RESULT_SELECTOR + ',.wshs-picker')) return true;
+        if (!node.querySelector(NON_RESULT_SELECTOR + ',.wshs-picker') || !Array.from(node.childNodes).every(transientGeometryNode)) return false;
+        var identity = [node.getAttribute('class'), node.getAttribute('style'), node.getAttribute('hidden')].join('|');
+        // Removed portal wrappers have no computed style in Chromium. Reuse a
+        // connected classification only while their layout attributes agree.
+        if (!node.isConnected && neutralGeometryWrappers.get(node) === identity) return true;
+        var style = node.isConnected ? getComputedStyle(node) : node.style;
+        var neutral = style.display === 'none' || style.display === 'contents' || style.position === 'fixed' || style.position === 'absolute';
+        if (neutral && node.isConnected) neutralGeometryWrappers.set(node, identity);
+        else neutralGeometryWrappers.delete(node);
+        return neutral;
+    }
+    function invalidateGeometry(changes) {
+        if (!fallbackGeometry) return;
+        for (var change of changes) {
+            var target = change.target.nodeType === 1 ? change.target : change.target.parentElement;
+            if (!target) continue;
+            if (target.closest(NON_RESULT_SELECTOR + ',.wshs-picker')) continue;
+            // Body receives portal insertions too. Inspect the changed subtree,
+            // since its mutation target is outside the transient overlay.
+            if (change.type === 'childList') {
+                var changed = Array.from(change.addedNodes).concat(Array.from(change.removedNodes));
+                if (changed.length && changed.every(transientGeometryNode)) continue;
+            }
+            // Filter visibility is deliberately absent from unfiltered geometry.
+            if (change.type === 'attributes' && change.attributeName === 'class' && geometryClass(change.oldValue) === geometryClass(target.getAttribute('class'))) continue;
+            var stylesheet = target.closest('style,link[rel="stylesheet"]') || change.type === 'childList' && Array.from(change.addedNodes).concat(Array.from(change.removedNodes)).some(function (node) { return node.nodeType === 1 && node.matches('style,link[rel="stylesheet"]'); });
+            if (stylesheet || !geometryParent || geometryParent.contains(target) || target.contains(geometryParent) || target.parentElement?.contains(geometryParent)) {
+                fallbackGeometry = null;
+                return;
+            }
+        }
+    }
+    var geometryObserver = new MutationObserver(invalidateGeometry);
+    var geometryWatching = false;
+    function watchGeometry() {
+        if (geometryWatching) return;
+        geometryWatching = true;
+        geometryObserver.observe(document, { childList:true, subtree:true, characterData:true, attributes:true, attributeOldValue:true, attributeFilter:['class','style','href','media','width','height','hidden'] });
+    }
+    window.addEventListener('resize', function () { fallbackGeometry = null; });
+    document.addEventListener('load', function (event) { if (event.target.matches?.('link[rel="stylesheet"]')) fallbackGeometry = null; }, true);
+    document.fonts.addEventListener('loadingdone', function () { fallbackGeometry = null; });
+    function geometryStyleKey(parentStyle, cardStyle) {
+        // CSSOM edits (insertRule/adopted stylesheets) do not emit mutations.
+        // Check the supported fallback's layout inputs without visiting its list.
+        var parentKeys = ['display','width','columnGap','rowGap','gridTemplateColumns','flexDirection','flexWrap','justifyContent','alignItems','direction','writingMode','fontSize','zoom','transform','paddingLeft','paddingRight','borderLeftWidth','borderRightWidth'];
+        var cardKeys = ['width','minWidth','maxWidth','boxSizing','flexBasis','flexGrow','flexShrink','marginLeft','marginRight','paddingLeft','paddingRight','borderLeftWidth','borderRightWidth','fontSize','zoom','transform'];
+        return parentKeys.map(function (key) { return parentStyle[key]; }).concat(cardKeys.map(function (key) { return key === 'minWidth' && cardStyle[key] === 'auto' ? '0px' : cardStyle[key]; })).join('|');
+    }
 
     function getCardGeometry() {
         var cards = enumerateCards();
+        invalidateGeometry(geometryObserver.takeRecords());
+        if (geometryCards !== cards) {
+            geometryCards = cards;
+            geometryParent = cards[0]?.root.parentElement;
+            geometrySharedParent = !!geometryParent && cards.every(function (card) { return card.root.parentElement === geometryParent; });
+            fallbackGeometry = null;
+        }
+        // Grid tracks remain measurable when filters hide every card. Reading
+        // them avoids unhiding/re-hiding the list and forcing two full layouts.
+        var grid = geometrySharedParent && geometryParent;
+        if (grid) {
+            var style = getComputedStyle(grid), tracks = style.gridTemplateColumns.split(/\s+/);
+            if (style.display === 'grid' && tracks.length && tracks.every(function (v) { return /^\d+(?:\.\d+)?px$/.test(v); })) {
+                var widths = tracks.map(parseFloat).filter(function (n) { return n > 0; }), box = grid.getBoundingClientRect();
+                var count = Math.min(widths.length, cards.length);
+                var scale = grid.offsetWidth ? box.width / grid.offsetWidth : 1;
+                var gap = (parseFloat(style.columnGap) || 0) * scale;
+                if (count && widths.every(function (n) { return Math.abs(n - widths[0]) < 1; }) && box.width > 0) {
+                    var left = box.left + ((parseFloat(style.paddingLeft) || 0) + (parseFloat(style.borderLeftWidth) || 0)) * scale;
+                    var width = widths[0] * scale;
+                    return {width:width,gap:gap,columns:count,left:left,right:left+width*count+gap*(count-1),card:cards[0].root};
+                }
+            }
+        }
+        watchGeometry();
+        // Unsupported layouts still receive the complete, conservative pass on
+        // invalidation. Repeated scroll/toolbar positioning can reuse that pass
+        // without touching any card or temporarily restoring the entire list.
+        var parentBox = geometryParent && geometryParent.getBoundingClientRect();
+        var cardStyle = geometrySharedParent && getComputedStyle(cards[0].root);
+        var styleKey = cardStyle && geometryStyleKey(style, cardStyle);
+        if (fallbackGeometry && parentBox && fallbackGeometry.parentWidth === parentBox.width &&
+            fallbackGeometry.viewportWidth === innerWidth && fallbackGeometry.viewportHeight === innerHeight && fallbackGeometry.styleKey === styleKey) {
+            var cached = fallbackGeometry.value;
+            var shift = parentBox.left - fallbackGeometry.parentLeft - geometryParent.scrollLeft + fallbackGeometry.scrollLeft;
+            return { width:cached.width, gap:cached.gap, columns:cached.columns, left:cached.left+shift, right:cached.right+shift, card:cached.card };
+        }
         var unhidden = [];
         for (var u = 0; u < cards.length; u++) {
             var hiddenRoot = cards[u].root;
@@ -436,11 +574,17 @@
             }
             var gap = gaps.length ? median(gaps) : 0;
             if (!(gap >= 0)) gap = 0;
-            return { width: width, gap: gap, columns: columns.length, card: rects[0].root };
+            var result = { width: width, gap: gap, columns: columns.length, left: columns[0].left, right: columns[columns.length-1].left+median(columns[columns.length-1].widths), card: rects[0].root };
+            // A shared parent supplies a stable coordinate reference even when
+            // every result is hidden. Mixed/nested layouts retain the safe pass.
+            if (geometrySharedParent && parentBox && /^\d+(?:\.\d+)?px$/.test(cardStyle.width) && (!/flex/.test(style.display) || cardStyle.flexShrink === '0')) fallbackGeometry = { value:result, parentWidth:parentBox.width, parentLeft:parentBox.left, scrollLeft:geometryParent.scrollLeft, viewportWidth:innerWidth, viewportHeight:innerHeight, styleKey:styleKey };
+            return result;
         } finally {
             for (var r = 0; r < unhidden.length; r++) {
                 unhidden[r].root.classList.add(unhidden[r].cls);
             }
+            // Discard only this synchronous measurement's filter class changes.
+            invalidateGeometry(geometryObserver.takeRecords());
         }
     }
 

@@ -1,0 +1,40 @@
+.wshs-compact-grid,.wshs-collection-browse-grid{grid-template-columns:repeat(var(--wshs-compact-columns),minmax(0,1fr))!important;gap:8px!important;align-items:stretch}
+.wshs-collection-browse-grid:not(.wshs-compact-grid){gap:12px!important}
+.wshs-compact-card{min-width:0!important}
+.wshs-compact-card .wshs-compact-details{padding:6px 7px!important;margin:0!important;width:auto!important;box-sizing:border-box;gap:3px!important;min-height:0!important}
+.wshs-compact-card .wshs-compact-title-wrap{height:48px!important;min-height:48px!important;max-height:48px!important;white-space:normal!important;overflow:hidden!important}
+.wshs-compact-card .wshs-compact-title{display:-webkit-box!important;-webkit-line-clamp:3;-webkit-box-orient:vertical;white-space:normal!important;overflow:hidden!important;overflow-wrap:anywhere;font-size:12px!important;line-height:16px!important;max-height:48px;text-overflow:clip!important}
+.wshs-compact-card a[href*="/myworkshopfiles"]{font-size:11px!important;line-height:14px!important}
+/* Collection densities use six desktop columns in Compact and five in
+   Comfortable. The toolbar keeps individual card widths in both layouts. */
+.wshs-collection-browse-card{--wshs-collection-preview:96px;position:relative;align-items:center!important;align-self:stretch!important;height:auto!important;min-width:0!important}
+.wshs-collection-browse-card.wshs-compact-card{--wshs-collection-preview:80px}
+.wshs-collection-browse-card>.aspectratio_square,.wshs-collection-browse-card>.aspectratio_16x9{width:96px!important;height:96px!important;min-width:96px;flex:0 0 96px!important;align-self:center}
+.wshs-collection-browse-card.wshs-compact-card>.aspectratio_square,.wshs-collection-browse-card.wshs-compact-card>.aspectratio_16x9{width:80px!important;height:80px!important;min-width:80px;flex-basis:80px!important}
+.wshs-collection-browse-card>.aspectratio_square>a,.wshs-collection-browse-card>.aspectratio_16x9>a{display:block;width:100%;height:100%}
+.wshs-collection-browse-card>.aspectratio_square img,.wshs-collection-browse-card>.aspectratio_16x9 img{width:100%;height:100%;object-fit:contain}
+.wshs-collection-browse-card>.wshs-collection-browse-details{position:static!important;display:flex;flex-direction:column;flex:1!important;min-width:0!important;box-sizing:border-box;gap:4px!important;padding:8px 10px!important}
+.wshs-collection-browse-card.wshs-compact-card>.wshs-collection-browse-details{gap:3px!important;padding:6px 8px!important}
+.wshs-collection-browse-card .wshs-collection-browse-heading{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:2px!important;min-width:0}
+.wshs-collection-browse-card .wshs-collection-browse-title-group{display:flex;flex-direction:column;gap:2px;min-width:0;width:100%}
+.wshs-collection-browse-card .wshs-collection-browse-title-wrap{display:block;width:100%;height:auto!important;min-height:0!important;max-height:36px!important;overflow:hidden}
+.wshs-collection-browse-card .wshs-collection-browse-title{display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal!important;overflow:hidden!important;overflow-wrap:anywhere;font-size:13px!important;line-height:18px!important;max-height:36px;text-overflow:clip!important}
+.wshs-collection-browse-card.wshs-compact-card .wshs-collection-browse-title{font-size:12px!important;line-height:16px!important;max-height:32px}
+.wshs-collection-browse-card .wshs-collection-browse-title-group>div{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:11px!important;line-height:14px!important}
+.wshs-collection-browse-card a[href*="/myworkshopfiles"]{font-size:11px!important;line-height:14px!important}
+.wshs-collection-browse-heading>:last-child,.wshs-collection-browse-heading>:last-child>div{height:14px;min-height:0;line-height:14px}
+.wshs-collection-browse-heading svg{width:14px;height:14px}
+.wshs-collection-browse-card .wshs-collection-browse-details>:nth-child(2){display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;min-width:0;padding:0!important;font-size:12px;line-height:16px!important;max-height:32px}
+.wshs-collection-browse-card.wshs-compact-card>.wshs-collection-browse-details>:nth-child(2){-webkit-line-clamp:1;font-size:11px;line-height:15px!important;max-height:15px}
+.wshs-collection-browse-card .wshs-collection-browse-details>:nth-child(3){display:none!important}
+/* Keep Steam's original Quick View action on the preview, clear of all text. */
+.wshs-collection-browse-card .wshs-collection-browse-actions{position:absolute!important;left:calc(var(--wshs-collection-preview) - 24px)!important;top:calc(50% + var(--wshs-collection-preview)/2 - 24px)!important;right:auto!important;bottom:auto!important;transform:none!important;gap:0!important;padding:0!important;z-index:2}
+.wshs-collection-browse-actions [role="button"],.wshs-collection-browse-actions button{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:24px;height:24px;padding:3px;background:#171d25e6;border-radius:2px}
+.wshs-collection-browse-actions svg{width:18px;height:18px}
+@media(max-width:600px){.wshs-collection-browse-card,.wshs-collection-browse-card.wshs-compact-card{--wshs-collection-preview:72px}.wshs-collection-browse-card>.aspectratio_square,.wshs-collection-browse-card>.aspectratio_16x9,.wshs-collection-browse-card.wshs-compact-card>.aspectratio_square,.wshs-collection-browse-card.wshs-compact-card>.aspectratio_16x9{width:72px!important;height:72px!important;min-width:72px;flex-basis:72px!important}}
+.wshs-no-hover-motion,.wshs-no-hover-motion *,.wshs-no-hover-motion::before,.wshs-no-hover-motion::after{transition:none!important;animation:none!important}
+.wshs-no-hover-motion:hover,.wshs-no-hover-motion:hover .aspectratio_square,.wshs-no-hover-motion:hover .aspectratio_16x9,.wshs-no-hover-motion:hover .aspectratio_square img,.wshs-no-hover-motion:hover .aspectratio_16x9 img{transform:none!important}
+.wshs-paused-carousel{scroll-behavior:auto!important}
+.wshs-still-parent{position:relative!important}
+.wshs-frozen-preview{opacity:0!important}
+.wshs-still-preview{position:absolute;pointer-events:none;display:block}

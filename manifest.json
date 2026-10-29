@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
     "name": "Steam Workshop Filter Plus",
-    "version": "1.4.0",
-    "description": "Hide subscribed Steam Workshop items, filter by star rating, and save keyword and author filters per game.",
+    "version": "1.5.0",
+    "description": "Hide subscribed Workshop items, filter ratings, and save keyword, author, and dependency filters per game.",
     "icons": {
         "16": "icons/icon-16.png",
         "32": "icons/icon-32.png",
@@ -10,6 +10,11 @@
         "128": "icons/icon-128.png"
     },
     "permissions": ["storage"],
+    "action": { "default_popup": "popup.html", "default_title": "Steam Workshop Filter Plus", "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png" } },
+    "optional_host_permissions": ["https://api.steampowered.com/*"],
+    "host_permissions": ["https://steam-workshop-data.prodbycave.workers.dev/*"],
+    "background": { "service_worker": "steam-api.js" },
+    "options_ui": { "page": "options.html", "open_in_tab": true },
     "content_scripts": [
         {
             "matches": [
@@ -17,8 +22,8 @@
                 "*://*.steamcommunity.com/sharedfiles/filedetails/*",
                 "*://*.steamcommunity.com/app/*/workshop/*"
             ],
-            "js": ["workshop-metadata.js", "collection-descriptions.js", "steam-dom.js", "content.js", "collection-row-align.js", "sort-popover-fit.js", "pluralize.js", "title-word-inflection.js", "saved-filters.js", "collection-sizes.js"],
-            "css": ["styles.css", "saved-filters.css"],
+            "js": ["api-client.js", "workshop-metadata.js", "collection-descriptions.js", "workshop-dependencies.js", "filter-matching.js", "steam-dom.js", "content.js", "collection-row-align.js", "sort-popover-fit.js", "pluralize.js", "title-word-inflection.js", "saved-filters.js", "collection-sizes.js", "workshop-sidebar.js", "filter-bar-pinning.js", "workshop-appearance.js", "preview-motion.js", "workshop-result-count.js", "collection-layout.js"],
+            "css": ["styles.css", "saved-filters.css", "workshop-sidebar.css", "workshop-appearance.css", "collection-layout.css"],
             "run_at": "document_start"
         },
         {
@@ -26,7 +31,7 @@
                 "*://*.steamcommunity.com/workshop/*",
                 "*://*.steamcommunity.com/app/*/workshop/*"
             ],
-            "js": ["hydration-signal.js", "search-terms-hook.js"],
+            "js": ["hydration-signal.js", "search-terms-hook.js", "browse-integration.js"],
             "run_at": "document_start",
             "world": "MAIN"
         },

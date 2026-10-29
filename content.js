@@ -6,6 +6,7 @@ let renderRatingsPreference = null;
 let widthSync = null;
 let widthSyncCleanup = null;
 let fontsReadyHooked = false;
+window.addEventListener('wshs-appearance-ready', () => { if (widthSync) widthSync(); });
 
 // One uniform font F on all three controls (star, hide and the native sort
 // label). 13px keeps the widest known label on one line at the logged-in card
@@ -580,12 +581,46 @@ function createButtons() {
         }
     }
 
-    // Four controls fit one row on wide grids. At narrower widths they use
-    // two equal columns, keeping readable labels and the native sort last.
+    // Four full-card controls and a reset column on the sidebar side.
+    // The square hugs the card edge nearest the four controls on either side.
+    const resetSlot = document.createElement('div');
+    resetSlot.className = 'wshs-toolbar-reset-slot';
+    const resetButton = document.createElement('button');
+    resetButton.type = 'button'; resetButton.className = 'wshs-toolbar-reset';
+    resetButton.textContent = '×';
+    resetButton.setAttribute('aria-label', 'Reset toolbar filters');
+    resetButton.title = 'Reset subscribed, ratings and stars; sort by Most Popular (One Week)';
+    if (isCollectionArea) {
+        resetButton.classList.add('wshs-collection-reset');
+        resetButton.textContent = '↻ Reset';
+        resetButton.title = 'Reset subscription and rating filters';
+        resetButton.setAttribute('aria-label', 'Reset collection filters');
+        // collection-row-align moves this existing handler into the header
+        // once saved-filters has mounted, regardless of script timing.
+        injectedControls.appendChild(resetButton);
+    }
+    else resetSlot.appendChild(resetButton);
+    resetButton.addEventListener('click', async e => {
+        e.stopPropagation();
+        isHidingSubscribed = false; currentStarFilter = 0; minimumRatings = 0;
+        renderHideState(); renderStarLabel(); renderRatings(); closeRatings();
+        dropdownContent.classList.remove('show'); applyFilters();
+        await chrome.storage.local.set({ hideSubscribed: false, starFilter: 0, minimumRatings: 0 });
+        if (isCollectionArea) return;
+        const handled = !window.dispatchEvent(new Event('wshs-reset-toolbar-sort', { cancelable: true }));
+        if (!handled) {
+            // Preserve the rest of the user's query if Steam's native bridge is unavailable.
+            const url = new URL(location.href);
+            url.searchParams.set('browsesort', 'trend'); url.searchParams.set('days', '7'); url.searchParams.set('p', '1');
+            location.assign(url.href);
+        }
+    });
     let toolbarLayout = null;
     function restoreToolbarLayout() {
         if (!toolbarLayout) return;
         const saved = toolbarLayout;
+        resetSlot.remove();
+        saved.parent.style.removeProperty('--wshs-unused-grid-width');
         for (const [key,value] of Object.entries(saved.parentStyle)) saved.parent.style[key] = value;
         for (const [key,value] of Object.entries(saved.wrapperStyle)) saved.wrapper.style[key] = value;
         toolbarLayout = null;
@@ -604,6 +639,8 @@ function createButtons() {
             return;
         }
         const parent = liveSort.wrapper.parentElement;
+        const pane = document.querySelector('.wshs-saved-filters');
+        const sidebarRight = geometry && pane ? pane.getBoundingClientRect().left > geometry.left : document.documentElement.getAttribute('data-wshs-sidebar-position') === 'right';
         if (!toolbarLayout || toolbarLayout.parent !== parent || toolbarLayout.wrapper !== liveSort.wrapper) {
             restoreToolbarLayout();
             const parentStyle = {}, wrapperStyle = {};
@@ -612,13 +649,18 @@ function createButtons() {
             toolbarLayout = {parent, wrapper:liveSort.wrapper, parentStyle, wrapperStyle};
         }
         const gap = geometry && geometry.gap > 0 ? geometry.gap : 10;
-        const columns = geometry ? Math.min(4, geometry.columns) : 1;
-        const span = geometry ? geometry.width * columns + gap * (columns-1) : Math.max(220,parent.clientWidth);
-        const wideCell = geometry ? columns >= 4 ? geometry.width : (span-geometry.width-3*gap)/3 : 0;
-        const wide = columns >= 4 || (columns >= 3 && wideCell >= 165);
-        const twoColumns = !wide && span >= 380;
-        const cell = wide ? wideCell : twoColumns ? (span-gap)/2 : span;
-        const sortWidth = wide ? geometry.width : cell;
+        const columns = geometry ? geometry.columns : 1;
+        const controlColumns = Math.min(5, columns);
+        const wide = controlColumns === 5;
+        const cell = geometry ? Math.min(geometry.width,(geometry.right-geometry.left-gap*(controlColumns-1))/controlColumns) : Math.max(220,parent.clientWidth);
+        const span = cell * controlColumns + gap * (controlColumns-1);
+        const sortWidth = cell;
+        const unusedWidth = geometry ? Math.max(0,geometry.right-geometry.left-span) : 0;
+        const unusedValue = unusedWidth+'px';
+        if(parent.style.getPropertyValue('--wshs-unused-grid-width')!==unusedValue){
+            parent.style.setProperty('--wshs-unused-grid-width',unusedValue);
+            window.dispatchEvent(new Event('wshs-toolbar-geometry'));
+        }
         const worstSort = getWorstCaseInk(sort) || IWORST_FALLBACK_ESTIMATE;
         const ownInk = worstCaseOwnInk || 120;
         const scale = Math.min(1,(cell-56)/ownInk,(sortWidth-68)/worstSort);
@@ -632,28 +674,52 @@ function createButtons() {
         applyNativeSortAnatomy(sort);
         const height = Math.max(38,...buttons.map(b=>b.getBoundingClientRect().height),sort.getBoundingClientRect().height);
         for (const button of [...buttons,sort]) button.style.height=height+'px';
+        resetButton.style.width=height+'px'; resetButton.style.height=height+'px';
         injectedControls.classList.add('wshs-four-filter-controls');
-        injectedControls.style.marginLeft='auto';
+        injectedControls.style.marginLeft=sidebarRight?'auto':'0px';
         injectedControls.style.gap=gap+'px';
         injectedControls.style.flexWrap='nowrap';
-        liveSort.wrapper.style.width=sortWidth+'px';
+        if (sidebarRight) {
+            if (resetSlot.parentElement !== parent || resetSlot.previousElementSibling !== liveSort.wrapper) liveSort.wrapper.insertAdjacentElement('afterend', resetSlot);
+        } else if (resetSlot.parentElement !== parent || resetSlot.nextElementSibling !== injectedControls) injectedControls.insertAdjacentElement('beforebegin', resetSlot);
+        resetSlot.style.width=cell+'px'; resetSlot.style.height=height+'px';
+        resetSlot.style.justifyContent=sidebarRight?'flex-start':'flex-end';
+        liveSort.wrapper.style.width=cell+'px';
         if (wide) {
             for (const [key,value] of Object.entries(toolbarLayout.parentStyle)) parent.style[key]=value;
             for (const key of ['position','right','left','top','bottom']) liveSort.wrapper.style[key]=toolbarLayout.wrapperStyle[key];
             injectedControls.style.display='flex';
-            injectedControls.style.width=(span-sortWidth-gap)+'px';
+            for (const child of injectedControls.children) { child.style.removeProperty('grid-column'); child.style.removeProperty('grid-row'); }
+            injectedControls.style.width=(3*cell+2*gap)+'px';
             injectedControls.style.marginRight=Math.max(0,gap-getRowColumnGap(sort))+'px';
+            resetSlot.style.position='static';resetSlot.style.left='';resetSlot.style.top='';
+            resetSlot.style.marginLeft=sidebarRight?Math.max(0,gap-getRowColumnGap(sort))+'px':'auto';
+            resetSlot.style.marginRight=sidebarRight?'0px':Math.max(0,gap-getRowColumnGap(sort))+'px';
         } else {
             if (getComputedStyle(parent).position==='static') parent.style.position='relative';
             parent.style.alignItems='flex-start';
-            parent.style.minHeight=(twoColumns?2*height+gap:4*height+3*gap)+'px';
+            const rows = Math.ceil(5/controlColumns);
+            parent.style.minHeight=(rows*height+(rows-1)*gap)+'px';
             injectedControls.style.display='grid';
-            injectedControls.style.gridTemplateColumns=twoColumns?'repeat(2,minmax(0,1fr))':'1fr';
+            injectedControls.style.gridTemplateColumns='repeat('+controlColumns+',minmax(0,1fr))';
+            Array.from(injectedControls.children).forEach((child,index) => {
+                const slot=index+(sidebarRight?0:1);
+                child.style.gridColumn=String(slot%controlColumns+1);
+                child.style.gridRow=String(Math.floor(slot/controlColumns)+1);
+            });
             injectedControls.style.width=span+'px';
             injectedControls.style.marginRight='0px';
             liveSort.wrapper.style.position='absolute';
-            liveSort.wrapper.style.right='0px';liveSort.wrapper.style.bottom='0px';
-            liveSort.wrapper.style.left='auto';liveSort.wrapper.style.top='auto';
+            const controlsLeft = geometry ? geometry.left+(sidebarRight?0:unusedWidth)-parent.getBoundingClientRect().left : injectedControls.getBoundingClientRect().left-parent.getBoundingClientRect().left;
+            const sortIndex=sidebarRight?3:4;
+            const resetIndex=sidebarRight?rows*controlColumns-1:0;
+            liveSort.wrapper.style.right='auto';liveSort.wrapper.style.bottom='auto';
+            liveSort.wrapper.style.left=(controlsLeft+(sortIndex%controlColumns)*(cell+gap))+'px';
+            liveSort.wrapper.style.top=(Math.floor(sortIndex/controlColumns)*(height+gap))+'px';
+            resetSlot.style.position='absolute';resetSlot.style.marginLeft='0px';
+            resetSlot.style.marginRight='0px';
+            resetSlot.style.left=(controlsLeft+(resetIndex%controlColumns)*(cell+gap))+'px';
+            resetSlot.style.top=(Math.floor(resetIndex/controlColumns)*(height+gap))+'px';
         }
     }
 
@@ -811,7 +877,7 @@ function applyFiltersIfNeeded() {
     if (isHidingSubscribed || currentStarFilter > 0 || minimumRatings > 0) {
         applyFilters();
     }
-    // Any DOM change (added nodes branch) re-evaluates the geometry from the
+    // Result/control changes re-evaluate the geometry from the
     // unfiltered grid structure, so a filter can never leave the controls in
     // the fallback layout and a React-replaced sort button is re-resolved.
     if (widthSync) widthSync();
@@ -854,12 +920,7 @@ function init() {
 // True when a removed node was (or contained) the native sort button, so the
 // geometry sync can re-resolve the replacement instead of freezing.
 function nodeContainsSortButton(node) {
-    if (!node || node.nodeType !== 1) return false;
-    if (node.matches && node.matches('div[role="button"][tabindex]') &&
-        node.querySelector('svg[viewBox="0 0 12 8"]')) {
-        return true;
-    }
-    return !!(node.querySelector && node.querySelector('div[role="button"][tabindex] svg[viewBox="0 0 12 8"]'));
+    return containsRelevantDom(node, 'div[role="button"][tabindex] svg[viewBox="0 0 12 8"]');
 }
 
 // DOM changes are batched to one pass per animation frame. While a big page
@@ -886,6 +947,22 @@ function scheduleDomWork(level) {
     if (domWorkFrame === null) domWorkFrame = requestAnimationFrame(flushDomWork);
 }
 
+const DOM_DIALOG_SELECTOR = 'dialog, [role="dialog"], [aria-modal="true"]';
+const DOM_IGNORED_SELECTOR = DOM_DIALOG_SELECTOR + ', [popover], #workshop_item_hover, #global_hover, .wshs-picker';
+const DOM_RESULT_SELECTOR = 'a[href*="sharedfiles/filedetails/?id="], .aspectratio_16x9, .aspectratio_square, .collectionItem, .workshopItemCollection, .workshopItem';
+const DOM_CONTROL_SELECTOR = '.subscribeCollection, .workshop_browse_menu_area, .workshop_browse_options, .collectionControls > .workshopItemControls, [role="combobox"], button[data-accent-color], .hide-subscribed-button, .wshs-injected-controls';
+
+function containsRelevantDom(node, selector) {
+    if (!node || node.nodeType !== 1 || node.closest(DOM_IGNORED_SELECTOR)) return false;
+    if (node.matches(selector)) return true;
+    // Check only the changed subtree. Dialog dependencies can be nested in a
+    // portal wrapper, so excluding just a dialog at the mutation root is unsafe.
+    for (const match of node.querySelectorAll(selector)) {
+        if (!match.closest(DOM_IGNORED_SELECTOR)) return true;
+    }
+    return false;
+}
+
 // Set up mutation observer to handle dynamically loaded content
 const observer = new MutationObserver((mutations) => {
     lastDomMutationAt = Date.now();
@@ -893,22 +970,21 @@ const observer = new MutationObserver((mutations) => {
         // Our own label/state changes (star or hide click) already ran the
         // filters synchronously; re-running them here doubled the click cost.
         const target = mutation.target.nodeType === 1 ? mutation.target : mutation.target.parentElement;
-        if (target && target.closest('.wshs-injected-controls, .wshs-saved-filters, .wshs-picker, .wshs-collection-summary')) continue;
-        if (mutation.addedNodes.length) {
+        if (target && target.closest('.wshs-injected-controls, .wshs-saved-filters, .wshs-collection-summary, ' + DOM_IGNORED_SELECTOR)) continue;
+        // Text/title replacement inside a native result link is relevant; a
+        // tooltip or author picker added elsewhere inside a card is not.
+        if (target && target.closest('a[href*="sharedfiles/filedetails/?id="], .workshopItemTitle, .fileRating')) {
             scheduleDomWork(2);
             return;
         }
-        for (const node of mutation.removedNodes) {
-            if (node.nodeType === 1 && (node.classList.contains('hide-subscribed-button') ||
-                node.classList.contains('wshs-injected-controls') ||
-                node.querySelector('.hide-subscribed-button'))) {
+        for (const node of [...mutation.addedNodes, ...mutation.removedNodes]) {
+            if (containsRelevantDom(node, DOM_RESULT_SELECTOR) || containsRelevantDom(node, DOM_CONTROL_SELECTOR)) {
                 scheduleDomWork(2);
                 return;
             }
             if (widthSync && nodeContainsSortButton(node)) {
                 // React replaced the native sort node; re-resolve and re-apply.
                 scheduleDomWork(1);
-                return;
             }
         }
     }

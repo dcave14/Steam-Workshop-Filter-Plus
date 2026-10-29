@@ -1,5 +1,8 @@
 # Dependencies
 node_modules/
+.dev.vars*
+.env*
+.wrangler/
 
 # Build output (node build.js)
 dist/
@@ -21,3 +24,9 @@ NEXT.md
 
 # Saved filters test output (tests/saved-filters-test.js)
 tests/out/
+
+# Local scratch: screenshots, design prototypes and logo drafts
+temp-screenshots/
+prototypes/
+docs/logo-variations/
+docs/logo-v2-prompt.txt
