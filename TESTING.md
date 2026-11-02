@@ -2,7 +2,11 @@
 
 How this project is tested.
 
-## Local changes after 1.5.0
+## 1.5.1 responsive fixes
+
+The 1.5.1 packages use the tested runtime from `c66db52`, with the manifest
+version updated. Release packaging verifies every ZIP entry against committed
+source and keeps the Chrome/Firefox identities and permission sets intact.
 
 The browse search row is search / gear / reset on the left sidebar and
 reset / gear / search on the right, keeping gear and reset paired with reset
@@ -157,7 +161,7 @@ re-enabling, and unaffected Workshop/browse tabs; Firefox also checks saved-off
 startup. The layout script waits for storage before moving any Steam nodes.
 The release regression set now has 24 passing suites including these toggle checks.
 
-1.5.0 is the last shipped version. Labels such as 1.9.x and 1.10.x below
+1.5.1 is the last shipped version. Labels such as 1.9.x and 1.10.x below
 identify earlier local iterations, not published store releases.
 
 October 27 performance and sidebar correction: collection sidebars pin at 12px

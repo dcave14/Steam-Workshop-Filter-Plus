@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.5.1 (2026-11-02)
 - Responsive Workshop controls stay aligned through resizing, sidebar flips and Comfortable / Compact layouts, including the small-window Apply filters button
 - Search, gear and reset share a height, with gear and reset paired and mirrored to the sidebar's outside edge
 - Consistent dropdown styling with centered sort options, underlined section headings and text capped by each button's font size
@@ -15,8 +15,6 @@
 - Native 75/100-item paging, mirrored card-aligned controls and reset buttons
 - Faster collection scrolling, creator controls and filter changes through cached discovery, targeted observers and fewer layout writes
 - Fixed the unnecessary gap above pinned collection sidebars and a startup hydration race in loaded-result counts
-
-1.5.0 is the last shipped release. The changes above have no new release number yet.
 
 ## 1.4.0
 - Saved keyword and creator filters per game, in the Workshop sidebar and under the collection filter bar, shared between both page types
