@@ -1,0 +1,25 @@
+const assert=require('assert/strict');
+const {launch,closeBrowser,wait}=require('./browser-helpers');
+const {fixture}=require('./filter-fixtures');
+(async()=>{const b=await launch();try{
+ const p=await b.newPage();await p.setViewport({width:1435,height:1000});const errors=[];p.on('pageerror',e=>errors.push(e.message));
+ let html=fixture(true);
+ const bar=html.match(/<div class="subscribeCollection">[\s\S]*?<\/div>/)[0];
+ html=html.replace(bar,'').replace('<body>','<body><div class="collectionTop"><div class="collectionHeader"><div class="workshopItemTitle">Delayed collection fixture</div></div></div><div class="collectionControls"><div class="workshopItemControls">Native review controls</div></div>');
+ await p.setRequestInterception(true);p.on('request',r=>r.respond({status:200,contentType:r.isNavigationRequest()?'text/html':'application/json',body:r.isNavigationRequest()?html:'{}'}));
+ await p.goto('https://steamcommunity.com/sharedfiles/filedetails/?id=3521297585',{waitUntil:'load'});
+ await wait(200);
+ assert.equal(await p.$('.wshs-design-collection'),null,'no redesign before native controls exist');
+ assert.equal(await p.$('.hide-subscribed-button'),null,'earlier review controls do not take the collection filters');
+ await p.evaluate(bar=>document.querySelector('.collectionChildren').insertAdjacentHTML('beforebegin',bar),bar);
+ await p.waitForSelector('.wshs-collection-filters',{timeout:3000});
+ await p.waitForSelector('.wshs-design-collection',{timeout:3000});
+ assert.equal(await p.$$eval('.wshs-collection-filters',ns=>ns.length),1,'late controls initialize saved filters exactly once');
+ assert.equal(await p.$$eval('.collectionItem',ns=>ns.length),8,'all native rows survive delayed initialization');
+ assert.equal(await p.$$eval('.subscribeCollection > .general_btn',ns=>ns.length),3,'native collection actions survive delayed initialization');
+ assert.equal(await p.$eval('.wshs-design-info>.workshopItemTitle',n=>n.textContent),'Delayed collection fixture','native collection title survives delayed initialization');
+ await p.evaluate(()=>document.body.appendChild(document.createElement('div')));await wait(150);
+ assert.equal(await p.$$eval('.wshs-design-collection',ns=>ns.length),1,'later mutations do not duplicate the redesign');
+ assert.deepEqual(errors,[],'no delayed initialization page errors');
+ console.log('8 delayed collection initialization checks passed.');
+}finally{await closeBrowser(b);}})().catch(e=>{console.error(e);process.exitCode=1;});

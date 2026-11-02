@@ -71,7 +71,9 @@ function getControlArea() {
     // review bar) earlier in document order, which a single combined
     // querySelector would return first.
     const collectionArea = document.querySelector('.subscribeCollection');
-    if (collectionArea) return collectionArea;
+    // A streamed collection's review bar can arrive before its action row.
+    // Wait for the intended row rather than injecting into that earlier bar.
+    if (collectionArea || /\/sharedfiles\/filedetails\/?$/.test(location.pathname)) return collectionArea;
     const legacyArea = document.querySelector('.workshop_browse_menu_area, .workshop_browse_options, .collectionControls>.workshopItemControls');
     if (legacyArea) return legacyArea;
     if (window.WSHSDom && window.WSHSDom.isNewLayout()) {
@@ -273,6 +275,7 @@ function createButtons() {
     renderRatings();
     function closeRatings() { ratingsMenu.classList.remove('show'); ratingsButton.setAttribute('aria-expanded', 'false'); }
     ratingsButton.addEventListener('click', e => {
+        syncDropdownFonts();
         e.stopPropagation(); dropdownContent.classList.remove('show');
         const open = !ratingsMenu.classList.contains('show'); ratingsMenu.classList.toggle('show', open); ratingsButton.setAttribute('aria-expanded', String(open));
     });
@@ -331,6 +334,7 @@ function createButtons() {
 
     // Add event listeners for star filter
     starButton.addEventListener('click', (e) => {
+        syncDropdownFonts();
         e.stopPropagation();
         closeRatings();
         dropdownContent.classList.toggle('show');
@@ -492,24 +496,22 @@ function createButtons() {
         }
     }
 
-    // Steam's native sort button is display:flex with justify-content:normal
-    // and a fixed gap:20px, so under our forced shared width the [sort
-    // icon][label][chevron] cluster left-packs and the slack collects after the
-    // chevron. space-between pins each icon to its 10px padding edge and splits
-    // the remaining slack around the middle item, so the label ink is centered
-    // with equal whitespace both sides - the same three-zone result the
-    // injected buttons get from their flexing label span. Padding is
-    // normalized to 10px to match the injected buttons.
+    // Keep Steam's original label node and callbacks. Match the other controls'
+    // icon widths and reserve space on either side so wrapped text stays clear
+    // of the icons. The frozen label measurements below reserve a stable height.
     function applyNativeSortAnatomy(button) {
         if (!button) return;
         button.style.position = 'relative';
         button.style.justifyContent = 'center';
         button.style.paddingLeft = '30px';
         button.style.paddingRight = '30px';
+        button.style.textAlign = 'center';
+        button.style.whiteSpace = 'normal';
         const icons = button.querySelectorAll('svg');
         for (let i=0;i<icons.length;i++) {
             icons[i].style.position='absolute'; icons[i].style.top='50%'; icons[i].style.transform='translateY(-50%)';
             icons[i].style.left=i===0?'8px':'auto'; icons[i].style.right=i===0?'auto':'8px';
+            icons[i].style.width=i===0?'20px':'12px'; icons[i].style.height='auto';
         }
         for (const span of button.querySelectorAll('span')) if (!span.children.length && span.textContent.trim()) {
             span.style.textAlign='center';span.style.flex='1 1 auto';span.style.minWidth='0';
@@ -550,14 +552,14 @@ function createButtons() {
         if (liveSort && liveSort.button) sortNodes.push(liveSort.button);
         if (liveSort && liveSort.wrapper) sortNodes.push(liveSort.wrapper);
         if (typeof ResizeObserver === 'function') {
-            if (!sortResizeObserver) sortResizeObserver = new ResizeObserver(() => resync());
+            if (!sortResizeObserver) sortResizeObserver = new ResizeObserver(scheduleGeometry);
             if (!sameNodes(sortNodes, observedSortNodes)) {
                 sortResizeObserver.disconnect();
                 for (const node of sortNodes) sortResizeObserver.observe(node);
                 observedSortNodes = sortNodes;
             }
             const card = geometry && geometry.card ? geometry.card : null;
-            if (!cardResizeObserver) cardResizeObserver = new ResizeObserver(() => resync());
+            if (!cardResizeObserver) cardResizeObserver = new ResizeObserver(scheduleGeometry);
             if (card && card !== observedCard) {
                 cardResizeObserver.disconnect();
                 cardResizeObserver.observe(card);
@@ -574,15 +576,14 @@ function createButtons() {
         if (labelNode !== observedLabelNode) {
             if (sortLabelObserver) sortLabelObserver.disconnect();
             if (labelNode && typeof MutationObserver === 'function') {
-                if (!sortLabelObserver) sortLabelObserver = new MutationObserver(() => resync());
+                if (!sortLabelObserver) sortLabelObserver = new MutationObserver(scheduleGeometry);
                 sortLabelObserver.observe(labelNode, { childList: true, characterData: true, subtree: true });
             }
             observedLabelNode = labelNode;
         }
     }
 
-    // Four full-card controls and a reset column on the sidebar side.
-    // The square hugs the card edge nearest the four controls on either side.
+    // Four full-card controls; browse reset mirrors with the search group.
     const resetSlot = document.createElement('div');
     resetSlot.className = 'wshs-toolbar-reset-slot';
     const resetButton = document.createElement('button');
@@ -616,17 +617,98 @@ function createButtons() {
         }
     });
     let toolbarLayout = null;
+    let geometryFrame = null;
+    let lastToolbarMetrics = null;
+    let resetSearchRow = null;
+    let resetSearchSlot = null;
+    let searchGear = null;
+    let applyLayout = null;
+    function restoreApplyLayout() {
+        if (!applyLayout) return;
+        applyLayout.button.classList.remove('wshs-apply-filters');
+        applyLayout.wrapper.classList.remove('wshs-apply-filters-slot');
+        for (const [node,style] of applyLayout.styles) {
+            if (style === null) node.removeAttribute('style'); else node.setAttribute('style',style);
+        }
+        applyLayout = null;
+    }
+    function fitApplyButton(parent, width, font) {
+        if (!applyLayout || !applyLayout.button.isConnected || !parent.contains(applyLayout.button) || applyLayout.wrapper.parentElement !== parent) {
+            restoreApplyLayout();
+            const icon = parent.querySelector('svg[viewBox="0 0 25 24"]');
+            const button = icon && icon.closest('button,[role="button"]');
+            if (!button) return;
+            let wrapper = button;
+            while (wrapper.parentElement && wrapper.parentElement !== parent) wrapper = wrapper.parentElement;
+            const nodes = [button,wrapper,...button.querySelectorAll('svg,span')];
+            applyLayout = {button,wrapper,styles:new Map(nodes.map(node=>[node,node.getAttribute('style')])),metrics:null};
+            button.classList.add('wshs-apply-filters');
+            wrapper.classList.add('wshs-apply-filters-slot');
+        }
+        const headerWidth = parent.getBoundingClientRect().width;
+        const searchWidth = Math.floor(Math.min(250,Math.max(160,headerWidth-width-4))*64)/64+'px';
+        if (parent.style.getPropertyValue('--wshs-mobile-search-width') !== searchWidth) parent.style.setProperty('--wshs-mobile-search-width', searchWidth);
+        const height = resetSearchRow ? resetSearchRow.getBoundingClientRect().height : 42;
+        const metrics = [width,font,height,searchWidth].join('|');
+        if (applyLayout.metrics === metrics) return;
+        applyLayout.metrics = metrics;
+        const set = (node,styles) => { for (const [key,value] of Object.entries(styles)) if (node.style[key] !== value) node.style[key] = value; };
+        set(applyLayout.wrapper,{width:width+'px',height:height+'px',flexShrink:'0',alignSelf:'flex-start'});
+        set(applyLayout.button,{width:width+'px',minWidth:width+'px',height:height+'px',boxSizing:'border-box',fontSize:font,lineHeight:'normal',position:'relative',justifyContent:'center',textAlign:'center',whiteSpace:'nowrap',paddingLeft:'30px',paddingRight:'30px',gap:'6px',boxShadow:'rgba(0, 0, 0, 0.6) 1px 1px 10px 0px'});
+        for (const span of applyLayout.button.querySelectorAll('span')) if (!span.children.length && span.textContent.trim()) set(span,{fontSize:font});
+        [...applyLayout.button.querySelectorAll('svg')].forEach((icon,index)=>set(icon,{position:'absolute',top:'50%',transform:'translateY(-50%)',left:index===0?'8px':'auto',right:index===0?'auto':'8px',width:index===0?'20px':'12px',height:'auto'}));
+    }
+    function mountBrowseReset(parent, sidebarRight) {
+        if (!searchGear || !searchGear.isConnected || !parent.contains(searchGear) || searchGear.parentElement !== resetSearchRow) {
+            if (resetSearchRow) resetSearchRow.classList.remove('wshs-search-controls');
+            if (resetSearchSlot) resetSearchSlot.classList.remove('wshs-search-slot');
+            const icon = parent.querySelector('.SVGIcon_Settings');
+            searchGear = icon && icon.closest('button,[role="button"]');
+            resetSearchRow = searchGear && searchGear.parentElement;
+            resetSearchSlot = resetSearchRow;
+            while (resetSearchSlot && resetSearchSlot.parentElement !== parent) resetSearchSlot = resetSearchSlot.parentElement;
+        }
+        const searchReady = !isNewLayout || document.documentElement.getAttribute('data-wshs-search-hydrated') === '1' || document.documentElement.getAttribute('data-wshs-page-hydrated') === '1' || !!document.querySelector('#CommunityTemplate .wshs-saved-filters');
+        if (resetSearchRow && searchReady) {
+            if (!resetSearchRow.classList.contains('wshs-search-controls')) resetSearchRow.classList.add('wshs-search-controls');
+            if (resetSearchSlot && !resetSearchSlot.classList.contains('wshs-search-slot')) resetSearchSlot.classList.add('wshs-search-slot');
+            const form = resetSearchRow.querySelector('form');
+            if (sidebarRight && form) {
+                if (form.previousElementSibling !== searchGear) resetSearchRow.insertBefore(searchGear, form);
+                if (searchGear.previousElementSibling !== resetSlot) resetSearchRow.insertBefore(resetSlot, searchGear);
+            } else {
+                if (form && form.nextElementSibling !== searchGear) form.insertAdjacentElement('afterend', searchGear);
+                if (searchGear.nextElementSibling !== resetSlot) searchGear.insertAdjacentElement('afterend', resetSlot);
+            }
+            const gearWidth = searchGear.getBoundingClientRect().width;
+            if (gearWidth > 0 && resetSearchRow.style.getPropertyValue('--wshs-search-action-width') !== gearWidth + 'px') resetSearchRow.style.setProperty('--wshs-search-action-width', gearWidth + 'px');
+        } else if (resetSlot.parentElement !== parent) {
+            // Keep reset reachable on older/nonstandard markup without a gear.
+            parent.insertBefore(resetSlot, injectedControls);
+        }
+    }
+    function scheduleGeometry() {
+        if (geometryFrame === null) geometryFrame = requestAnimationFrame(() => { geometryFrame = null; resync(); });
+    }
     function restoreToolbarLayout() {
         if (!toolbarLayout) return;
         const saved = toolbarLayout;
+        restoreApplyLayout();
         resetSlot.remove();
+        if (resetSearchRow) resetSearchRow.classList.remove('wshs-search-controls');
+        if (resetSearchSlot) resetSearchSlot.classList.remove('wshs-search-slot');
+        resetSearchRow = null;
+        resetSearchSlot = null;
+        searchGear = null;
         saved.parent.style.removeProperty('--wshs-unused-grid-width');
+        saved.parent.style.removeProperty('--wshs-mobile-search-width');
+        saved.parent.removeAttribute('data-wshs-toolbar-layout');
         for (const [key,value] of Object.entries(saved.parentStyle)) saved.parent.style[key] = value;
         for (const [key,value] of Object.entries(saved.wrapperStyle)) saved.wrapper.style[key] = value;
         toolbarLayout = null;
     }
     function resync() {
-        if (isCollectionArea) return;
+        if (isCollectionArea) { syncDropdownFonts(); return; }
         const liveSort = getLiveSortInfo();
         const sort = liveSort && liveSort.button;
         const geometry = isNewLayout && window.WSHSDom ? window.WSHSDom.getCardGeometry() : null;
@@ -640,7 +722,8 @@ function createButtons() {
         }
         const parent = liveSort.wrapper.parentElement;
         const pane = document.querySelector('.wshs-saved-filters');
-        const sidebarRight = geometry && pane ? pane.getBoundingClientRect().left > geometry.left : document.documentElement.getAttribute('data-wshs-sidebar-position') === 'right';
+        const sidebarPosition = document.documentElement.getAttribute('data-wshs-sidebar-position');
+        const sidebarRight = sidebarPosition ? sidebarPosition === 'right' : geometry && pane ? pane.getBoundingClientRect().left > geometry.left : false;
         if (!toolbarLayout || toolbarLayout.parent !== parent || toolbarLayout.wrapper !== liveSort.wrapper) {
             restoreToolbarLayout();
             const parentStyle = {}, wrapperStyle = {};
@@ -650,12 +733,25 @@ function createButtons() {
         }
         const gap = geometry && geometry.gap > 0 ? geometry.gap : 10;
         const columns = geometry ? geometry.columns : 1;
-        const controlColumns = Math.min(5, columns);
-        const wide = controlColumns === 5;
-        const cell = geometry ? Math.min(geometry.width,(geometry.right-geometry.left-gap*(controlColumns-1))/controlColumns) : Math.max(220,parent.clientWidth);
-        const span = cell * controlColumns + gap * (controlColumns-1);
-        const sortWidth = cell;
-        const unusedWidth = geometry ? Math.max(0,geometry.right-geometry.left-span) : 0;
+        const wide = columns >= 4 && window.innerWidth >= 1000;
+        // Use balanced rows below four card columns or on mobile. Keep at
+        // least 160px per control rather than leaving a lone full-width sort.
+        // Use the actual grid bounds: extrapolating rounded card widths can
+        // exceed the row by a fraction of a pixel and wrap below the search.
+        const grid = geometry && geometry.card && geometry.card.parentElement;
+        const available = Math.max(1, Math.min(grid ? grid.getBoundingClientRect().width : geometry ? geometry.right - geometry.left : parent.clientWidth, parent.clientWidth));
+        const controlColumns = wide ? 4 : available >= 640 + gap * 3 ? 4 : available >= 320 + gap ? 2 : 1;
+        function slot(index) {
+            const row = Math.floor(index / controlColumns), count = Math.min(controlColumns, 4 - row * controlColumns);
+            const width = Math.max(1, (available - gap * (count - 1)) / count);
+            return { row, count, column: index % controlColumns, width };
+        }
+        const buttonSlots = buttons.map((button, index) => slot(index));
+        const sortSlot = slot(3);
+        const cell = wide ? Math.floor(Math.min(geometry.width, (available - gap * (columns - 1)) / columns) * 64) / 64 : slot(0).width;
+        const span = wide ? cell * 4 + gap * 3 : available;
+        const sortWidth = wide ? cell : sortSlot.width;
+        const unusedWidth = geometry ? Math.max(0,available-span) : 0;
         const unusedValue = unusedWidth+'px';
         if(parent.style.getPropertyValue('--wshs-unused-grid-width')!==unusedValue){
             parent.style.setProperty('--wshs-unused-grid-width',unusedValue);
@@ -663,67 +759,77 @@ function createButtons() {
         }
         const worstSort = getWorstCaseInk(sort) || IWORST_FALLBACK_ESTIMATE;
         const ownInk = worstCaseOwnInk || 120;
-        const scale = Math.min(1,(cell-56)/ownInk,(sortWidth-68)/worstSort);
+        const scale = Math.min(1,(Math.min(cell,...buttonSlots.map(s=>s.width))-56)/ownInk,(sortWidth-68)/worstSort);
         const font = Math.max(10,Math.floor(13*scale*10)/10)+'px';
-        for (const button of buttons) {
+        for (const [index, button] of buttons.entries()) {
             applyUniformFont(button,font);
-            setButtonWidth(button,cell,4);
+            setButtonWidth(button,wide?cell:buttonSlots[index].width,4);
             button.style.height = '';
         }
         applyUniformFont(sort,font);setButtonWidth(sort,sortWidth,6);sort.style.height = '';
         applyNativeSortAnatomy(sort);
-        const height = Math.max(38,...buttons.map(b=>b.getBoundingClientRect().height),sort.getBoundingClientRect().height);
+        const sortLineHeight = Math.ceil(parseFloat(font) * 1.2);
+        sort.style.lineHeight = sortLineHeight + 'px';
+        const sortStyle = getComputedStyle(sort);
+        const sortPadding = parseFloat(sortStyle.paddingTop) + parseFloat(sortStyle.paddingBottom);
+        const sortLines = worstSort * parseFloat(font) / parseFloat(BUTTON_FONT_SIZE) > sortWidth - 60 ? 2 : 1;
+        const height = Math.max(38, sortLines * sortLineHeight + sortPadding, ...buttons.map(b=>b.getBoundingClientRect().height),sort.getBoundingClientRect().height);
         for (const button of [...buttons,sort]) button.style.height=height+'px';
-        resetButton.style.width=height+'px'; resetButton.style.height=height+'px';
         injectedControls.classList.add('wshs-four-filter-controls');
-        injectedControls.style.marginLeft=sidebarRight?'auto':'0px';
+        const layoutMode = wide ? 'cards' : 'compact';
+        if (parent.getAttribute('data-wshs-toolbar-layout') !== layoutMode) parent.setAttribute('data-wshs-toolbar-layout', layoutMode);
+        injectedControls.style.marginLeft=sidebarRight?'0px':'auto';
         injectedControls.style.gap=gap+'px';
         injectedControls.style.flexWrap='nowrap';
-        if (sidebarRight) {
-            if (resetSlot.parentElement !== parent || resetSlot.previousElementSibling !== liveSort.wrapper) liveSort.wrapper.insertAdjacentElement('afterend', resetSlot);
-        } else if (resetSlot.parentElement !== parent || resetSlot.nextElementSibling !== injectedControls) injectedControls.insertAdjacentElement('beforebegin', resetSlot);
-        resetSlot.style.width=cell+'px'; resetSlot.style.height=height+'px';
-        resetSlot.style.justifyContent=sidebarRight?'flex-start':'flex-end';
+        mountBrowseReset(parent, sidebarRight);
+        fitApplyButton(parent, cell, font);
         liveSort.wrapper.style.width=cell+'px';
         if (wide) {
+            injectedControls.style.minHeight='';
+            injectedControls.style.gridTemplateRows='';
             for (const [key,value] of Object.entries(toolbarLayout.parentStyle)) parent.style[key]=value;
             for (const key of ['position','right','left','top','bottom']) liveSort.wrapper.style[key]=toolbarLayout.wrapperStyle[key];
             injectedControls.style.display='flex';
             for (const child of injectedControls.children) { child.style.removeProperty('grid-column'); child.style.removeProperty('grid-row'); }
             injectedControls.style.width=(3*cell+2*gap)+'px';
             injectedControls.style.marginRight=Math.max(0,gap-getRowColumnGap(sort))+'px';
-            resetSlot.style.position='static';resetSlot.style.left='';resetSlot.style.top='';
-            resetSlot.style.marginLeft=sidebarRight?Math.max(0,gap-getRowColumnGap(sort))+'px':'auto';
-            resetSlot.style.marginRight=sidebarRight?'0px':Math.max(0,gap-getRowColumnGap(sort))+'px';
         } else {
             if (getComputedStyle(parent).position==='static') parent.style.position='relative';
             parent.style.alignItems='flex-start';
-            const rows = Math.ceil(5/controlColumns);
-            parent.style.minHeight=(rows*height+(rows-1)*gap)+'px';
+            parent.style.minHeight=toolbarLayout.parentStyle.minHeight;
+            const rows = Math.ceil(4/controlColumns);
             injectedControls.style.display='grid';
-            injectedControls.style.gridTemplateColumns='repeat('+controlColumns+',minmax(0,1fr))';
+            injectedControls.style.minHeight=(rows*height+(rows-1)*gap)+'px';
+            const tracks=controlColumns;
+            injectedControls.style.gridTemplateColumns='repeat('+tracks+',minmax(0,1fr))';
+            injectedControls.style.gridTemplateRows='repeat('+rows+','+height+'px)';
             Array.from(injectedControls.children).forEach((child,index) => {
-                const slot=index+(sidebarRight?0:1);
-                child.style.gridColumn=String(slot%controlColumns+1);
-                child.style.gridRow=String(Math.floor(slot/controlColumns)+1);
+                const s=buttonSlots[index], span=tracks/s.count;
+                child.style.gridColumn=(s.column*span+1)+' / span '+span;
+                child.style.gridRow=String(s.row+1);
             });
-            injectedControls.style.width=span+'px';
-            injectedControls.style.marginRight='0px';
+            injectedControls.style.width=available+'px';
+            injectedControls.style.marginLeft=sidebarRight?'0px':'auto';
+            injectedControls.style.marginRight=sidebarRight?'auto':'0px';
             liveSort.wrapper.style.position='absolute';
-            const controlsLeft = geometry ? geometry.left+(sidebarRight?0:unusedWidth)-parent.getBoundingClientRect().left : injectedControls.getBoundingClientRect().left-parent.getBoundingClientRect().left;
-            const sortIndex=sidebarRight?3:4;
-            const resetIndex=sidebarRight?rows*controlColumns-1:0;
+            // Use the actual flow position: on small screens Steam wraps the
+            // search onto its own row, and pinned bars have a different origin.
+            const parentBox=parent.getBoundingClientRect(), controlsBox=injectedControls.getBoundingClientRect();
+            const controlsLeft=controlsBox.left-parentBox.left, controlsTop=controlsBox.top-parentBox.top;
             liveSort.wrapper.style.right='auto';liveSort.wrapper.style.bottom='auto';
-            liveSort.wrapper.style.left=(controlsLeft+(sortIndex%controlColumns)*(cell+gap))+'px';
-            liveSort.wrapper.style.top=(Math.floor(sortIndex/controlColumns)*(height+gap))+'px';
-            resetSlot.style.position='absolute';resetSlot.style.marginLeft='0px';
-            resetSlot.style.marginRight='0px';
-            resetSlot.style.left=(controlsLeft+(resetIndex%controlColumns)*(cell+gap))+'px';
-            resetSlot.style.top=(Math.floor(resetIndex/controlColumns)*(height+gap))+'px';
+            liveSort.wrapper.style.width=sortWidth+'px';
+            liveSort.wrapper.style.left=(controlsLeft+sortSlot.column*(sortWidth+gap))+'px';
+            liveSort.wrapper.style.top=(controlsTop+sortSlot.row*(height+gap))+'px';
+        }
+        syncDropdownFonts();
+        const metrics = [font, sortWidth, height, layoutMode].join('|');
+        if (!lastToolbarMetrics || lastToolbarMetrics.button !== sort || lastToolbarMetrics.value !== metrics) {
+            lastToolbarMetrics = {button:sort,value:metrics};
+            window.dispatchEvent(new Event('wshs-toolbar-layout'));
         }
     }
 
-    widthSync = resync;
+    widthSync = scheduleGeometry;
 
     // New layout: immediately left of the native sort button's wrapper. Legacy
     // pages keep today's injection point.
@@ -737,13 +843,39 @@ function createButtons() {
     starFilterContainer.style.flex = 'none';
     hideButton.style.flex = 'none';
 
-    window.addEventListener('resize', resync);
+    // Read actual trigger labels on every surface, including the fixed-height
+    // collection toolbar. Batch the reads and avoid unchanged menu writes.
+    const dropdownFonts = [[ratingsLabel, ratingsMenu], [starLabel, dropdownContent]];
+    let dropdownFontFrame = null;
+    function syncDropdownFonts() {
+        const sizes = dropdownFonts.map(([label]) => getComputedStyle(label).fontSize);
+        dropdownFonts.forEach(([,menu], index) => {
+            if (menu.style.getPropertyValue('--wshs-dropdown-button-font-size') !== sizes[index]) menu.style.setProperty('--wshs-dropdown-button-font-size', sizes[index]);
+        });
+    }
+    function scheduleDropdownFonts() {
+        if (dropdownFontFrame === null) dropdownFontFrame = requestAnimationFrame(() => { dropdownFontFrame = null; syncDropdownFonts(); });
+    }
+    const dropdownFontResize = new ResizeObserver(scheduleDropdownFonts);
+    const dropdownFontObserver = new MutationObserver(scheduleDropdownFonts);
+    for (const button of [ratingsButton, starButton]) {
+        dropdownFontResize.observe(button);
+        dropdownFontObserver.observe(button, {attributes:true,subtree:true,attributeFilter:['style','class']});
+    }
+    window.addEventListener('resize', scheduleDropdownFonts);
+    scheduleDropdownFonts();
+
+    window.addEventListener('resize', scheduleGeometry);
     widthSyncCleanup = () => {
         restoreToolbarLayout();
-        window.removeEventListener('resize', resync);
+        window.removeEventListener('resize', scheduleGeometry);
+        if (geometryFrame !== null) cancelAnimationFrame(geometryFrame);
         if (sortResizeObserver) sortResizeObserver.disconnect();
         if (cardResizeObserver) cardResizeObserver.disconnect();
         if (sortLabelObserver) sortLabelObserver.disconnect();
+        window.removeEventListener('resize', scheduleDropdownFonts);
+        dropdownFontResize.disconnect(); dropdownFontObserver.disconnect();
+        if (dropdownFontFrame !== null) cancelAnimationFrame(dropdownFontFrame);
     };
 
     // The frozen ink measured before the webfont is ready would be wrong; drop
@@ -998,9 +1130,9 @@ observer.observe(document, {
 // The only attribute this script needs is the hydration signal on <html>
 // (see hydration-signal.js); watching every attribute in the document made
 // the observer fire on Steam's constant hover and animation churn.
-new MutationObserver(() => scheduleDomWork(2)).observe(document.documentElement, {
+new MutationObserver(changes => scheduleDomWork(changes.some(change => change.attributeName !== 'data-wshs-sidebar-position') ? 2 : 1)).observe(document.documentElement, {
     attributes: true,
-    attributeFilter: ['data-wshs-hydrated']
+    attributeFilter: ['data-wshs-hydrated','data-wshs-search-hydrated','data-wshs-sidebar-position']
 });
 
 init();

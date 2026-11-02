@@ -93,13 +93,23 @@
         if (rowReady && !document.documentElement.hasAttribute('data-wshs-hydrated')) {
             document.documentElement.setAttribute('data-wshs-hydrated', '1');
         }
-        var pageReady = !!(window.SSR && window.SSR.hydrated === true && sidebarIsHydrated());
+        // Mobile has no mounted sidebar. Gate search-row edits on its own
+        // native handler instead of waiting for an absent sidebar boundary.
+        var gearIcon = document.querySelector('#CommunityTemplate .SVGIcon_Settings');
+        var gear = gearIcon && gearIcon.closest('button,[role="button"]');
+        var searchReady = !!(gear && hasHydratedClickHandler(gear));
+        if (searchReady && root.getAttribute('data-wshs-search-hydrated') !== '1') root.setAttribute('data-wshs-search-hydrated', '1');
+        // A fresh mobile page has no sidebar boundary to wait for. Any later
+        // drawer/sidebar mount is client-rendered with its native handlers.
+        var pageReady = !!(window.SSR && window.SSR.hydrated === true &&
+            (innerWidth < 1000 ? rowReady && searchReady : sidebarIsHydrated()));
         var previews = document.querySelectorAll('#CommunityTemplate .aspectratio_16x9 img, #CommunityTemplate .aspectratio_square img');
-        if (window.SSR && window.SSR.hydrated === true && previews.length && Array.prototype.every.call(previews, hasFiber)) {
+        var previewsReady = window.SSR && window.SSR.hydrated === true && previews.length && Array.prototype.every.call(previews, hasFiber);
+        if (previewsReady && root.getAttribute('data-wshs-previews-ready') !== '1') {
             root.setAttribute('data-wshs-previews-ready', '1');
         }
-        if (pageReady) root.setAttribute('data-wshs-page-hydrated', '1');
-        if ((!rowReady || !pageReady) && Date.now() - started < MAX_WAIT_MS) {
+        if (pageReady && root.getAttribute('data-wshs-page-hydrated') !== '1') root.setAttribute('data-wshs-page-hydrated', '1');
+        if ((!rowReady || !pageReady || !searchReady || !previewsReady) && Date.now() - started < MAX_WAIT_MS) {
             setTimeout(check, POLL_MS);
         } else if (!pageReady && root.getAttribute('data-wshs-page-hydrated') === '0') {
             // Unknown/new Steam internals: release the load-plus-quiet fallback

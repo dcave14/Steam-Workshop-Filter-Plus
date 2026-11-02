@@ -51,7 +51,9 @@
             return;
         }
         var position = root.getAttribute('data-wshs-sidebar-position');
-        if (state.preferences && (position === 'left' || position === 'right') && appliedPosition !== position) {
+        // There is no sidebar column on mobile. Applying its side while the
+        // drawer opens rebuilds Steam's header and dismisses that native menu.
+        if (innerWidth >= 1000 && state.preferences && (position === 'left' || position === 'right') && appliedPosition !== position) {
             appliedPosition = position;
             if (state.preferences.preferences.filters_column !== position) { state.preferences.setPreferences({ filters_column: position }); return; }
         }
@@ -96,6 +98,7 @@
     new MutationObserver(schedule).observe(document, { childList: true, subtree: true });
     new MutationObserver(schedule).observe(root, { attributes: true, attributeFilter: ['data-wshs-page-hydrated', 'data-wshs-sidebar-position'] });
     window.addEventListener('popstate', schedule);
+    window.addEventListener('resize', schedule);
     if (window.navigation) window.navigation.addEventListener('currententrychange', schedule);
     schedule();
 })();

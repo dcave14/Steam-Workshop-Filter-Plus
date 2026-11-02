@@ -1,6 +1,13 @@
 # Changelog
 
-## 1.5.0 (unreleased)
+## Unreleased
+- Responsive Workshop controls stay aligned through resizing, sidebar flips and Comfortable / Compact layouts, including the small-window Apply filters button
+- Search, gear and reset share a height, with gear and reset paired and mirrored to the sidebar's outside edge
+- Consistent dropdown styling with centered sort options, underlined section headings and text capped by each button's font size
+- The mobile Apply filters panel and nested choices follow their buttons' text size and width, with one scroll area in the panel
+- Collection filters initialize when Steam's native controls arrive after page load
+
+## 1.5.0
 - Workshop-style collection pages with native descriptions, authors, ratings, awards, linked collections and account controls
 - Filter groups, direct required-mod filters, and inspection of hidden items, including subscribed mods
 - Whole-word keyword matching: `AI` matches `AI`, not `rain`; optional full-description matching never searches comments
@@ -9,8 +16,7 @@
 - Faster collection scrolling, creator controls and filter changes through cached discovery, targeted observers and fewer layout writes
 - Fixed the unnecessary gap above pinned collection sidebars and a startup hydration race in loaded-result counts
 
-1.4.0 is the last shipped release. Intermediate local development labels were not
-published releases; the pending Chrome and Firefox packages both use 1.5.0.
+1.5.0 is the last shipped release. The changes above have no new release number yet.
 
 ## 1.4.0
 - Saved keyword and creator filters per game, in the Workshop sidebar and under the collection filter bar, shared between both page types

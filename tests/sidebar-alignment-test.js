@@ -1,6 +1,7 @@
 // Live geometry checks: both placements, four/five columns and existing sidebar pinning.
 const assert=require('assert/strict');
 const {launch,closeBrowser,extensionWorld,wait}=require('./browser-helpers');
+const {toolbarState}=require('./toolbar-layout-helpers');
 let checks=0;function check(name,value){assert.ok(value,name);checks++;console.log('PASS '+name);}
 const measure=`(()=>{
  const cards=WSHSDom.enumerateCards().map(x=>x.root.getBoundingClientRect()).filter(r=>r.width>0);
@@ -26,15 +27,15 @@ const measure=`(()=>{
     console.error('Sidebar wait diagnostics',JSON.stringify({width,side,storage:await world("chrome.storage.local.get(['sidebarPosition','pinnedSidebar'])"),page:await page.evaluate(()=>({side:document.documentElement.getAttribute('data-wshs-sidebar-position'),sections:[...document.querySelectorAll('.wshs-saved-filters')].map(n=>({left:n.getBoundingClientRect().left,width:n.getBoundingClientRect().width,classes:n.className,paneClasses:n.parentElement.className}))}))}));throw error;
    }
    await wait(150);
-   const base=await world(measure),buttons=base.buttons;
+   const base=await world(measure),buttons=base.buttons,toolbar=await page.evaluate(toolbarState);
    if(side==='left')leftWidths=buttons.map(b=>b.w);
    else check(width+': flipping preserves every control width',buttons.every((b,i)=>Math.abs(b.w-leftWidths[i])<1));
    const cardAligned=state=>state.buttons.every(button=>state.columns.some(card=>Math.abs(button.x-card.left)<1&&Math.abs(button.right-card.right)<1&&Math.abs(button.w-card.width)<1));
    if(!cardAligned(base))console.log(JSON.stringify({width,side,buttons:base.buttons,columns:base.columns}));
-   check(width+' '+side+': every control matches the card directly below its column',cardAligned(base));
-   check(width+' '+side+': control block mirrors to the outer grid edge',side==='left'?Math.abs(Math.max(...buttons.map(b=>b.right),base.reset.right)-base.grid.right)<1:Math.abs(buttons[0].x-base.grid.left)<1);
+   check(width+' '+side+': controls match cards or equally fill wrapped rows',toolbar.mode==='cards'?cardAligned(base):toolbar.equalRows&&toolbar.filledRows&&toolbar.separated);
+   check(width+' '+side+': control block mirrors to the outer grid edge',side==='left'?Math.abs(Math.max(...buttons.map(b=>b.right))-base.grid.right)<1:Math.abs(buttons[0].x-base.grid.left)<1);
    check(width+' '+side+': same-row control gaps match the card gap',buttons.slice(1).every((r,i)=>Math.abs(r.y-buttons[i].y)>1||Math.abs(r.x-buttons[i].right-base.geometry.gap)<1));
-   check(width+' '+side+': reset has its own card slot',base.columns.some(c=>Math.abs(c.left-base.reset.x)<1&&Math.abs(c.right-base.reset.right)<1)&&buttons.every(b=>Math.abs(b.y-base.reset.y)>1||Math.abs(b.x-base.reset.x)>1));
+   check(width+' '+side+': reset mirrors and matches search/gear dimensions',toolbar.searchReset&&toolbar.searchAligned);
    check(width+' '+side+': search flush with sidebar',Math.abs(base.search.x-base.pane.x)<1&&Math.abs(base.search.w-base.pane.w)<1);
    const top=Math.max(0,Math.floor(buttons[0].y)-15);
    await page.screenshot({path:'tests/out/aligned-'+width+'-'+side+'.png',clip:{x:0,y:top,width,height:Math.min(450,1000-top)}});
@@ -48,7 +49,8 @@ const measure=`(()=>{
     return a.scrollbarWidth===b.scrollbarWidth&&a.scrollbarColor===b.scrollbarColor&&ta.backgroundColor===tb.backgroundColor&&ta.borderRadius===tb.borderRadius&&getComputedStyle(pane,'::-webkit-scrollbar').width===getComputedStyle(native,'::-webkit-scrollbar').width;
    }));
    check(width+' '+side+': existing sidebar pinning is preserved',Math.abs(pinned.search.y-12)<1&&pinned.pane.y>=pinned.search.bottom&&pinned.pane.bottom<=1000);
-   check(width+' '+side+': pinning preserves exact card widths and columns',cardAligned(pinned));
+   const pinnedToolbar=await page.evaluate(toolbarState);
+   check(width+' '+side+': pinning preserves responsive controls',pinnedToolbar.mode==='cards'?cardAligned(pinned):pinnedToolbar.equalRows&&pinnedToolbar.filledRows&&pinnedToolbar.separated);
   }
  }
  if(errors.length)console.error('Live alignment page errors:',errors);

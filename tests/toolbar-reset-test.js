@@ -1,5 +1,6 @@
 const assert=require('assert/strict');
 const {launch,closeBrowser,extensionWorld,wait}=require('./browser-helpers');
+const {toolbarState}=require('./toolbar-layout-helpers');
 let checks=0;function check(name,value){assert.ok(value,name);checks++;console.log('PASS '+name);}
 (async()=>{const b=await launch();try{
  const p=await b.newPage();await p.setViewport({width:1780,height:1050});
@@ -20,7 +21,8 @@ let checks=0;function check(name,value){assert.ok(value,name);checks++;console.l
  for(const width of [1780,1100])for(const density of ['comfortable','compact'])for(const side of ['left','right']){
   await p.setViewport({width,height:1050});
   await w('chrome.storage.local.set('+JSON.stringify({layoutDensity:density,sidebarPosition:side})+')');await wait(300);
-  check(width+' '+density+' '+side+': reset hugs its own card edge nearest the filters',await w(`(()=>{const s=WSHSDom.getSortButton(),reset=document.querySelector('.wshs-toolbar-reset'),r=reset.getBoundingClientRect(),slot=reset.parentElement.getBoundingClientRect(),b=s.button.getBoundingClientRect(),cards=WSHSDom.enumerateCards().map(c=>c.root.getBoundingClientRect()),buttons=[...document.querySelectorAll('.hide-subscribed-button'),s.button].map(n=>n.getBoundingClientRect()),edge=${JSON.stringify(side)}==='left'?slot.left<=Math.min(...buttons.map(n=>n.left))&&Math.abs(r.right-slot.right)<1:slot.right>=Math.max(...buttons.map(n=>n.right))&&Math.abs(r.left-slot.left)<1;return edge&&cards.some(c=>Math.abs(c.left-slot.left)<1&&Math.abs(c.right-slot.right)<1)&&cards.some(c=>Math.abs(c.left-b.left)<1&&Math.abs(c.right-b.right)<1)&&buttons.every(n=>Math.abs(n.top-r.top)>1||n.right<=r.left||n.left>=r.right)&&Math.abs(r.width-b.height)<1&&Math.abs(r.height-b.height)<1&&!s.wrapper.contains(reset);})()`));
+  const state=await p.evaluate(toolbarState);
+  check(width+' '+density+' '+side+': reset mirrors, matches search/gear dimensions and controls fit',state.searchReset&&state.searchAligned&&state.separated&&state.inViewport&&(state.mode==='cards'||state.equalRows&&state.filledRows));
  }
  const styleKeys=['backgroundColor','backdropFilter','boxShadow','border','borderRadius','color'];
  const styleOf=selector=>p.$eval(selector,(n,keys)=>Object.fromEntries(keys.map(k=>[k,getComputedStyle(n)[k]])),styleKeys);

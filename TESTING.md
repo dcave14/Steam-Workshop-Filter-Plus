@@ -2,7 +2,111 @@
 
 How this project is tested.
 
-## Pending 1.5.0 release
+## Local changes after 1.5.0
+
+The browse search row is search / gear / reset on the left sidebar and
+reset / gear / search on the right, keeping gear and reset paired with reset
+outside. The same native gear is moved within its row so callbacks and keyboard
+order follow the mirrored layout. Reset takes the gear's width and stretches
+to the search/gear height, with the whole row flush to the sidebar. Search and
+gear retain their native nodes and handlers. The sidebar begins below search even when the controls need more
+than one row; its offset follows toolbar/search resizing and clears on mobile.
+Actual grid bounds constrain the controls so fractional card-width rounding
+cannot wrap them onto a separate row from search.
+Four substantive controls retain card widths when four desktop card columns fit.
+Other layouts use four, two or one equal-width controls per row, with at least
+160px per control, keeping intermediate widths balanced as two plus two.
+Below 1000px, control rows fill the available width without unused card columns.
+Search can shrink below 250px to share its header
+row with Apply filters, keeping at least 160px for search, gear and reset.
+`node tests/responsive-resize-test.js` covers same-page shrink/re-expand from
+1780px through 420px, including 1190px and both sides of the 1000px sidebar
+breakpoint, on Workshop items, Collections browse and collection detail,
+both sidebar sides and densities, pinned layouts and all-hidden browse results.
+It also checks the gap below search, reset mirroring and dimensions, same-row
+desktop search/controls, native collection links, IDs and rich description
+preservation and sort-label containment between its icons.
+At 768/752/740px the viewport height is 642px, matching the reported small window.
+Steam's native Apply filters button takes one control-column width, the toolbar
+font and the search row's height, with its original pointer/keyboard callbacks
+and focus treatment. Search and Apply filters share the top row when they fit,
+including the mirrored right-sidebar layout; the suite opens the native filter
+panel by pointer and Enter and closes it with Escape.
+Fresh 752×642 loads are also checked: the native gear's hydrated handler releases
+search/reset setup even though Steam has not mounted a sidebar. The readiness
+signal is written once, avoiding repeated filtering while the page settles.
+`node tests/apply-popover-responsive-test.js` checks the native panel at 900,
+875, 752, 660, 600, 495 and 420px, both browse surfaces, densities and sidebar sides. The panel
+matches its button's width and font, fits the viewport and has one scroll area.
+Nested native Special Filters choices follow their own trigger font/width;
+selection, Escape and keyboard reopening retain Steam's callbacks. `--firefox`
+and `--firefox --comfortable` cover the two Firefox presentation variants.
+Expanding a fresh mobile page also restores the chosen desktop sidebar without
+reloading. Native sidebar-side changes are deferred on mobile so opening its
+filter panel does not rebuild and dismiss that panel.
+Every toolbar menu, including rating status/retry text, is checked against its
+own trigger label on all three surfaces. Collection checks also shrink a label
+inside a fixed-size button to verify that the menu follows font changes without
+depending on geometry changes. Reads are batched; unchanged menu variables are
+not rewritten.
+Toolbar layout changes update open dropdown fonts and fit in the same frame,
+including when new results change the card-column count.
+Use `--detail-only` to rerun the collection detail portion; it waits for the actual
+six-control row to mount rather than sampling the earlier design shell.
+`--collection-id=3818340638` selects the Project Zomboid collection used in the
+dev browser. Steam can rate-limit a frequently reused live collection; startup
+timeouts now print the native response so that is distinguishable from a UI bug.
+Use `--fixture-detail` to run the same collection resize, native link/ID and rich
+description assertions against the deterministic native-markup fixture while
+Steam is throttling live detail pages. Browse checks still use live Steam pages.
+`toolbar-layout-helpers.js` supplies shared row/reset geometry assertions; the
+existing browse, alignment and reset suites use the updated contract. The release
+runner includes the resize, reset and delayed-initialization regressions.
+
+`node tests/sort-popover-responsive-test.js` keeps the native sort popup open
+while resizing and changing density/sidebar placement. Narrow buttons stack the
+sections; wide buttons use two columns. Both share the Star Rating/Ratings
+surface, blur, shadow, typography, padding and hover treatment, with centered
+option text one pixel smaller than its underlined section headings. Headings
+are capped at 11px and the button's current font size; options are capped at
+10px, so neither exceeds the trigger. The suite compares computed
+surface and row styles directly with the existing dropdowns.
+Scrollbar space is reserved on both sides so the content remains centered on
+the sort button. Steam's mobile panel minimum width is cleared so the inner
+surface also fits that button. The suite checks actual text-line centers and
+both outer/inner bounds in both layouts.
+Single-section sorts span the full menu. The popup suite selects every native
+sort option at wide and narrow widths, checking single- and two-section centers.
+The suite checks native timeframe callbacks and selected radios after reopening,
+pinning, and the search row's dimensions. `--firefox` seeds Compact/right;
+`--firefox --comfortable` seeds Comfortable/left. Popup discovery is structurally
+invalidated and button resizing is observed rather than rescanning on scroll.
+
+The sort surface and option rows share the Star Rating/Ratings CSS, including
+hover. Computed-style checks compare them directly and verify centering while
+result replacements change the toolbar layout. Native Steam's Firefox
+WebAssembly CSP warning was independently
+reproduced without any extension installed; the popup suite records that exact
+diagnostic and Firefox image-decoding diagnostics separately while retaining
+checks for other runtime/hydration errors. Native sort labels stay between their
+icons; space for wrapped labels is reserved before selection changes.
+Existing live-test failure: the Quick View co-creator visibility assertion for
+mod `3830470974` fails when choosing co-creator `堂丸`. It also fails against
+unchanged 1.5.0 source at `5789d97`; the selected creator is saved but the current
+mod becomes hidden. Keep this separate from the responsive layout verification.
+Run `node tests/release-regression.js --serial` while a visible dev browser is
+open to keep the total at two browsers. The default runner uses two workers;
+performance profiles must be run separately without concurrent test load.
+
+`node tests/collection-delayed-init-test.js` uses intercepted local fixture requests
+to reproduce native collection controls arriving after DOMContentLoaded. Saved
+filters now recover when those controls arrive within one minute, allowing the
+redesign to initialize exactly once. An earlier native review bar cannot take
+the filters while the collection action row is still streaming. The original
+source failed this case. This
+confirms a timing bug, not the user's particular Adblock Plus rule or blocked
+resource; no blocker bypass or real subscription mutation is involved. Version
+remains 1.5.0.
 
 Observer-work follow-up: all 29 release suites are validated. New
 `observer-work-regression-test.js` passes 108 checks using disposable instrumented
@@ -53,7 +157,7 @@ re-enabling, and unaffected Workshop/browse tabs; Firefox also checks saved-off
 startup. The layout script waits for storage before moving any Steam nodes.
 The release regression set now has 24 passing suites including these toggle checks.
 
-1.4.0 is the last shipped version. Labels such as 1.9.x and 1.10.x below
+1.5.0 is the last shipped version. Labels such as 1.9.x and 1.10.x below
 identify earlier local iterations, not published store releases.
 
 October 27 performance and sidebar correction: collection sidebars pin at 12px

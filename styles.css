@@ -10,8 +10,8 @@
 .wshs-four-filter-controls .wshs-toggle-slot { width: 12px; flex: 0 0 12px; }
 .wshs-ratings-control { min-width: 0; }
 .wshs-ratings-menu { width: 100%; box-sizing: border-box; }
-.wshs-ratings-status { padding: 8px; color: #8f98a0; font: 11px/1.4 Arial, sans-serif; white-space: normal; }
-.wshs-ratings-retry { border: 0; background: none; padding: 8px; color: #67c1f5; font: 12px Arial, sans-serif; cursor: pointer; }
+.wshs-ratings-status { padding: 8px; color: #8f98a0; font: 11px/1.4 Arial, sans-serif; font-size:min(11px,var(--wshs-dropdown-button-font-size,11px)); white-space: normal; }
+.wshs-ratings-retry { border: 0; background: none; padding: 8px; color: #67c1f5; font: 12px Arial, sans-serif; font-size:min(12px,var(--wshs-dropdown-button-font-size,12px)); cursor: pointer; }
 .wshs-ratings-retry[hidden] { display: none; }
 
 /* Collection: two aligned rows of three; reset lives in the saved-filter header. */
@@ -147,7 +147,7 @@
     border-radius: 0 0 3px 3px;
     color: #939393;
     font-family: "Motiva Sans", Arial, Helvetica, sans-serif;
-    font-size: 14px;
+    font-size: min(14px,var(--wshs-dropdown-button-font-size,14px));
 }
 
 .star-option {
@@ -161,27 +161,26 @@
     color: #3C3D3E;
 }
 
-/* New browse layout: styled after Steam's native sort popover in its fitted
-   (sort-popover-fit.js) form - gradient panel with blur and shadow, centered
-   11px #acb2b8 options. */
-.wshs-new-layout-controls .star-dropdown-content {
-    padding: 3.5px 0;
+/* All Workshop dropdowns share one surface and option treatment. */
+.wshs-new-layout-controls .star-dropdown-content,
+.wshs-sort-popover > div {
+    padding: 3.5px 0 !important;
     /* The buttons' background (translucent black, 4px backdrop blur) at 45%
        opacity instead of the buttons' 37%. Steam's sort popover uses the same
        (.wshs-sort-popover below). */
-    background: rgba(0, 0, 0, 0.45);
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
-    box-shadow: 1px 1px 10px 0 rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.45) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+    backdrop-filter: blur(4px) !important;
+    box-shadow: 1px 1px 10px 0 rgba(0, 0, 0, 0.6) !important;
     /* Clip the shadow at the top edge so it never falls on the button above;
        it only shows on the sides and bottom, like a dropdown. */
     clip-path: inset(0 -20px -20px -20px);
-    border: none;
-    border-radius: 0;
-    color: #acb2b8;
-    font-family: "Motiva Sans", Twemoji, "Noto Sans", Helvetica, sans-serif;
-    font-size: 11px;
-    font-weight: 400;
+    border: none !important;
+    border-radius: 0 !important;
+    color: #acb2b8 !important;
+    font-family: "Motiva Sans", Twemoji, "Noto Sans", Helvetica, sans-serif !important;
+    font-size: min(11px,var(--wshs-dropdown-button-font-size,11px)) !important;
+    font-weight: 400 !important;
     line-height: normal;
     white-space: nowrap;
 }
@@ -195,16 +194,18 @@
    gap, 3.5px + 5.5px = the previous 9px edge) so the hover highlight spans
    the full row width and height. Hover follows the buttons: a faint white
    wash on the translucent panel and the label turning white. */
-.wshs-new-layout-controls .star-option {
-    padding: 5.5px 9px;
-    color: inherit;
-    line-height: 17px;
+.wshs-new-layout-controls .star-option,
+.wshs-sort-popover [role="radio"] {
+    padding: 5.5px 9px !important;
+    color: inherit !important;
+    line-height: 17px !important;
     cursor: pointer;
 }
 
-.wshs-new-layout-controls .star-option:hover {
-    background-color: rgba(255, 255, 255, 0.08);
-    color: #fff;
+.wshs-new-layout-controls .star-option:hover,
+.wshs-sort-popover [role="radio"]:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: #fff !important;
 }
 
 /* Wrapper for the injected controls (legacy pages and the new React SSR layout).
@@ -392,33 +393,45 @@
     width: 14px;
     height: 14px;
 }
-/* Native sort popover fitted to the sort button's width (sort-popover-fit.js
-   marks the popover's fixed root and sets --wshs-sort-w). Compact two-column
-   layout: 11px labels, 10px section headers and radio dots scaled 12px -> 10px
-   so "Total Unique Subscribers" and "Three Months" fit side by side without
-   wrapping. Selectors are structural because Steam's class names are hashed:
+/* Native sort popover fitted to its button, with stacked sections on narrow
+   columns. Its surface and rows use the shared dropdown rules above. Structural selectors
+   retain Steam's own options and callbacks despite hashed class names:
    root > box > panel > column > [header, radiogroup > radio > (dot, label)]. */
 .wshs-sort-popover {
     width: var(--wshs-sort-w) !important;
+    max-width: calc(100vw - 16px);
 }
 
 .wshs-sort-popover > div {
     box-sizing: border-box;
-    width: 100%;
-    padding: 9px !important;
-    /* Exactly the buttons' background, like the star dropdown. */
-    background: rgba(0, 0, 0, 0.45) !important;
-    /* Steam's own shadow (#000) softened to match the buttons and the star
-       dropdown. */
-    box-shadow: 1px 1px 10px 0 rgba(0, 0, 0, 0.6) !important;
-    -webkit-backdrop-filter: blur(4px) !important;
-    backdrop-filter: blur(4px) !important;
+    /* Steam's mobile panel minimum must not overhang the fitted root. */
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    max-height: inherit;
+    overflow: auto;
+    scrollbar-gutter: stable both-edges;
 }
 
 .wshs-sort-popover > div > div {
-    gap: 6px !important;
+    display: grid !important;
+    grid-template-columns: minmax(0,1.6fr) minmax(0,1fr);
+    width: 100%;
+    min-width: 0;
+    gap: 14px !important;
+    background: transparent !important;
+    font: inherit !important;
+    color: inherit !important;
     flex-wrap: nowrap !important;
     justify-content: space-between;
+}
+
+.wshs-sort-popover[data-wshs-sort-layout="stacked"] > div > div {
+    grid-template-columns: minmax(0,1fr);
+}
+
+.wshs-sort-popover > div > div > div:only-child {
+    grid-column: 1 / -1;
 }
 
 .wshs-sort-popover > div > div > div {
@@ -426,28 +439,86 @@
     flex-direction: column;
     flex: 0 0 auto;
     min-width: 0;
-    gap: 9px !important;
+    gap: 3.5px !important;
+    font: inherit !important;
+    color: inherit !important;
 }
 
 .wshs-sort-popover > div > div > div > :first-child {
-    font-size: calc(var(--wshs-sort-fs, 11px) - 1px) !important;
+    font-size: var(--wshs-sort-heading-size,10px) !important;
+    line-height: 14px;
+    text-align: center;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    color: inherit !important;
 }
 
 .wshs-sort-popover [role="radiogroup"] {
-    gap: 11px !important;
+    min-width: 0;
+    gap: 0 !important;
+    font: inherit !important;
+    color: inherit !important;
 }
 
 .wshs-sort-popover [role="radio"] {
-    gap: 4px !important;
+    position: relative;
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: 0;
+    gap: 6px !important;
     align-items: center !important;
-    white-space: nowrap;
+    justify-content: center;
+    text-align: center;
+    font-family: inherit !important;
+    font-size: var(--wshs-sort-option-size,9px) !important;
+    font-style: inherit !important;
+    font-weight: inherit !important;
+    white-space: normal;
 }
 
 .wshs-sort-popover [role="radio"] > :first-child {
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    transform: translateY(-50%);
     zoom: 0.8333;
+    flex-shrink: 0;
 }
 
 .wshs-sort-popover [role="radio"] > span {
-    font-size: var(--wshs-sort-fs, 11px) !important;
-    white-space: nowrap;
+    box-sizing: border-box;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0 14px;
+    font: inherit !important;
+    color: inherit !important;
+    line-height: inherit;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
+
+/* The mobile native filter panel follows its trigger, with one scroll area. */
+.wshs-apply-popover,.wshs-apply-choice-popover {
+    translate:0 var(--wshs-apply-shift-y,0px);
+    width:var(--wshs-apply-width)!important;
+    min-width:0!important;
+    max-width:calc(100vw - 16px);
+    max-height:min(var(--popover-max-height,100dvh),calc(100dvh - 16px))!important;
+    overflow:auto;
+    overscroll-behavior:contain;
+}
+.wshs-apply-popover,.wshs-apply-popover *,
+.wshs-apply-choice-popover,.wshs-apply-choice-popover * {
+    font-size:var(--wshs-dropdown-button-font-size)!important;
+}
+.wshs-apply-popover > div {
+    width:100%!important;min-width:0!important;box-sizing:border-box;
+    padding:9px;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);
+    box-shadow:1px 1px 10px rgba(0,0,0,.6);
+}
+.wshs-apply-popover > div > div,
+.wshs-apply-popover > div > div > div > div {
+    min-width:0!important;max-height:none!important;overflow:visible!important;
+}
+.wshs-apply-popover > div > div {width:100%!important}

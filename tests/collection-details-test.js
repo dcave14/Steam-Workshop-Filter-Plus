@@ -1,8 +1,11 @@
 const assert=require('assert/strict');
 const{launch,closeBrowser,extensionWorld,wait}=require('./browser-helpers');
+const{dropdownFontsState}=require('./toolbar-layout-helpers');
 let checks=0;function check(name,value){assert.ok(value,name);console.log('PASS '+name);checks++;}
 (async()=>{const firefox=process.argv.includes('--firefox'),b=await launch(firefox?'firefox':undefined,firefox?{presentationPreferences:{pinnedSidebar:true,pinnedCollections:true}}:{});try{
  const p=await b.newPage();await p.setViewport({width:1780,height:1050});await p.goto('https://steamcommunity.com/sharedfiles/filedetails/?id=3824338247',{waitUntil:'domcontentloaded'});await p.waitForSelector('.wshs-design-related');
+ await p.waitForSelector('.wshs-collection-controls .star-filter-button');await wait(100);
+ const menuFonts=await p.evaluate(dropdownFontsState);check('all collection toolbar dropdown text is capped by its own button',menuFonts.fits);
  check('linked collections retain original previews, links and ratings in the sidebar',await p.$eval('.wshs-design-sidebar .wshs-design-linked-grid',n=>n.querySelectorAll(':scope>.workshopItem').length===2&&n.querySelectorAll('a[href*="id="]').length===4&&n.querySelectorAll('.fileRating').length===2));
  check('parent collection preserves its native navigation handler',await p.$eval('.wshs-design-parent-list .parentCollection',n=>n.getAttribute('onclick').includes('3565138082')&&!!n.querySelector('.parentCollectionTitle')));
  check('creator and version panels live in the redesigned sidebar',await p.$eval('.wshs-design-sidebar-details',n=>!!n.querySelector('.creatorsBlock .friendBlockLinkOverlay')&&n.textContent.includes('1.7')&&[...n.querySelectorAll('.rightSectionHolder')].filter(n=>n.textContent.includes('A collection of')).every(n=>n.hidden)));

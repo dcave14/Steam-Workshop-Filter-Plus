@@ -3,11 +3,13 @@
 const {spawn}=require('child_process'),fs=require('fs'),path=require('path');
 let suites=[
  ['card-discovery-test.js'],['dom-work-regression-test.js'],['observer-work-regression-test.js'],['workshop-geometry-test.js'],
- ['sidebar-alignment-test.js'],['sidebar-page-size-test.js'],
+ ['sidebar-alignment-test.js'],['sidebar-page-size-test.js'],['responsive-resize-test.js'],['toolbar-reset-test.js'],
+ ['sort-popover-responsive-test.js'],['sort-popover-responsive-test.js','--firefox'],['sort-popover-responsive-test.js','--firefox','--comfortable'],
+ ['apply-popover-responsive-test.js'],['apply-popover-responsive-test.js','--firefox'],['apply-popover-responsive-test.js','--firefox','--comfortable'],
  ['appearance-test.js'],['preview-motion-test.js'],
  ['browse-collections-test.js'],['browse-collections-test.js','--firefox'],
  ['browse-collections-test.js','--firefox','--comfortable'],
- ['collection-design-test.js'],['collection-details-test.js'],['collection-overhaul-test.js'],['collection-overhaul-test.js','--firefox'],
+ ['collection-design-test.js'],['collection-details-test.js'],['collection-delayed-init-test.js'],['collection-overhaul-test.js'],['collection-overhaul-test.js','--firefox'],
  ['collection-design-test.js','--firefox'],['collection-details-test.js','--firefox'],
  ['collection-filters-test.js'],['collection-size-ratings-test.js'],
  ['collection-subscriptions-test.js'],['filter-groups-test.js'],
@@ -30,4 +32,4 @@ async function worker(){while(next<suites.length){const args=suites[next++],name
  console.log((result.code===0?'PASS ':'FAIL ')+name+' ('+results.at(-1).seconds+'s)');if(result.code!==0)console.log(result.tail);
  fs.writeFileSync(path.join(out,'results.json'),JSON.stringify(results,null,2));
 }}
-Promise.all([worker(),worker()]).then(()=>{const failed=results.filter(r=>r.code!==0);console.log(results.length+' suites finished; '+failed.length+' failed.');process.exitCode=failed.length?1:0});
+Promise.all(Array.from({length:process.argv.includes('--serial')?1:2},()=>worker())).then(()=>{const failed=results.filter(r=>r.code!==0);console.log(results.length+' suites finished; '+failed.length+' failed.');process.exitCode=failed.length?1:0});

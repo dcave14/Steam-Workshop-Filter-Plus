@@ -1,5 +1,6 @@
 const assert=require('assert/strict');
 const {launch,closeBrowser,extensionWorld,openBrowse,wait}=require('./browser-helpers');
+const {toolbarState}=require('./toolbar-layout-helpers');
 const url='https://steamcommunity.com/workshop/browse/?appid=294100&browsesort=trend&section=collections';
 let checks=0;function check(name,value){assert.ok(value,name);console.log('PASS '+name);checks++;}
 (async()=>{const firefox=process.argv.includes('--firefox'),initialDensity=process.argv.includes('--comfortable')?'comfortable':'compact',b=await launch(firefox?'firefox':undefined,firefox?{presentationPreferences:{layoutDensity:initialDensity}}:{});try{
@@ -15,15 +16,16 @@ let checks=0;function check(name,value){assert.ok(value,name);console.log('PASS 
    for(const side of world?['left','right']:['left']){
     if(world)await world(`chrome.storage.local.set({sidebarPosition:'${side}'})`);await wait(120);
     check(density+' '+width+' '+side+': title, ratings and description stay within the card',await p.$$eval('.wshs-collection-browse-card > .aspectratio_square',ns=>ns.slice(0,12).every(preview=>{const card=preview.parentElement,c=card.getBoundingClientRect(),title=card.querySelector('.wshs-collection-browse-title'),t=title.parentElement.getBoundingClientRect(),stars=card.querySelector('.SVGIcon_Star_Filled,.SVGIcon_Star_Unfilled')?.parentElement.getBoundingClientRect();return t.width>0&&(!title.classList.contains('wshs-compact-title')||t.width>=100)&&t.left>=c.left&&t.right<=c.right+1&&(!stars||t.bottom<=stars.top+1||t.right<=stars.left+1)&&card.scrollWidth<=card.clientWidth+1;})));
-    check(density+' '+width+' '+side+': filter controls still match collection card columns',await p.evaluate(()=>{const card=document.querySelector('#CommunityTemplate .aspectratio_square').parentElement.getBoundingClientRect();return [...document.querySelectorAll('.hide-subscribed-button')].every(n=>Math.abs(n.getBoundingClientRect().width-card.width)<1);}));
+    const toolbar=await p.evaluate(toolbarState);
+    check(density+' '+width+' '+side+': controls retain card widths or equally fill wrapped rows',toolbar?.mode==='cards'?await p.evaluate(()=>{const card=document.querySelector('#CommunityTemplate .aspectratio_square').parentElement.getBoundingClientRect();return [...document.querySelectorAll('.hide-subscribed-button')].every(n=>Math.abs(n.getBoundingClientRect().width-card.width)<1);}):toolbar?.equalRows&&toolbar.filledRows&&toolbar.separated);
     check(density+' '+width+' '+side+': magnifiers stay inside thumbnails at every width',await p.$$eval('.wshs-collection-browse-card',ns=>ns.slice(0,12).every(n=>{const p=n.querySelector('.aspectratio_square').getBoundingClientRect(),q=n.querySelector('.wshs-collection-browse-actions [role="button"],.wshs-collection-browse-actions button').getBoundingClientRect();return q.left>=p.left-1&&q.right<=p.right+1&&q.top>=p.top-1&&q.bottom<=p.bottom+1;})));
     {
      check(density+' '+width+' '+side+': cards in each row have matching heights',await p.$$eval('.wshs-collection-browse-card',ns=>{const rows=new Map();return ns.length>0&&ns.every(n=>{const r=n.getBoundingClientRect();if(!r.width)return true;const row=Math.round(r.top);if(!rows.has(row))rows.set(row,r.height);return Math.abs(rows.get(row)-r.height)<1;});}));
-     if(width>=1000)check(density+' '+width+' '+side+': reset hugs its card edge nearest the filters',await p.evaluate(()=>{const r=document.querySelector('.wshs-toolbar-reset').getBoundingClientRect(),slot=document.querySelector('.wshs-toolbar-reset-slot').getBoundingClientRect(),pane=document.querySelector('.wshs-saved-filters').getBoundingClientRect(),controls=[...document.querySelectorAll('.hide-subscribed-button')].map(n=>n.getBoundingClientRect()),left=pane.left<slot.left;return (left?Math.abs(r.right-slot.right)<1:Math.abs(r.left-slot.left)<1)&&controls.every(c=>Math.abs(c.top-r.top)>1||c.right<=r.left||c.left>=r.right);}));
+     check(density+' '+width+' '+side+': reset mirrors and matches search/gear dimensions',toolbar?.searchReset&&toolbar.searchAligned);
      if(width===1780){
       check(density+' '+side+': correct collection count per desktop row',await p.$eval('.wshs-collection-browse-grid',(n,d)=>getComputedStyle(n).gridTemplateColumns.split(' ').length===(d==='compact'?6:5),density));
       check(density+' '+side+': cards stay short without item-count lines',await p.$$eval('.wshs-collection-browse-card',(ns,d)=>ns.every(n=>n.getBoundingClientRect().height<=(d==='compact'?100:124)&&getComputedStyle(n.querySelector('.wshs-collection-browse-details>:nth-child(3)')).display==='none'),density));
-      check(side+': all five toolbar slots stay on one desktop row',await p.evaluate(()=>{const controls=[...document.querySelectorAll('.hide-subscribed-button'),document.querySelector('.wshs-toolbar-reset')],r=controls[0].getBoundingClientRect(),sort=document.querySelector('.wshs-toolbar-reset-slot').parentElement;return controls.every(n=>Math.abs(n.getBoundingClientRect().top-r.top)<1)&&[...sort.children].filter(n=>n.textContent.includes('Most Popular')).some(n=>Math.abs(n.getBoundingClientRect().top-r.top)<1);}));
+      check(side+': four substantive controls stay on one desktop row',toolbar?.rows.length===1);
      }
     }
    }
@@ -38,6 +40,11 @@ let checks=0;function check(name,value){assert.ok(value,name);console.log('PASS 
  }
  await p.setViewport({width:1780,height:1050});await wait(150);await p.mouse.move(0,0);await p.$eval('.ratings-filter-button',n=>n.scrollIntoView());await p.screenshot({path:'tests/out/browse-collections-fixed-'+(firefox?'firefox':'chrome')+'.png'});
  check('Collection browsing retains the selected desktop density',await p.$eval('.wshs-collection-browse-grid',(n,d)=>getComputedStyle(n).gridTemplateColumns.split(' ').length===(d==='compact'?6:5),firefox?initialDensity:'compact'));
+ if(world){
+  await world("chrome.storage.local.set({layoutDensity:'comfortable',sidebarPosition:'left'})");await p.setViewport({width:1435,height:875});await wait(200);
+  await p.$eval('.wshs-search-controls',n=>scrollTo(0,scrollY+n.getBoundingClientRect().top-70));await wait(100);
+  await p.screenshot({path:'tests/out/browse-collections-responsive-1435.png'});
+ }
  if(errors.length)console.error('Browse collection page errors:',errors);
  check('no browse collection errors',!errors.length);console.log(checks+' '+(firefox?'Firefox':'Chrome')+' browse-collection checks passed.');
  }finally{await closeBrowser(b);}})().catch(e=>{console.error(e);process.exitCode=1;});

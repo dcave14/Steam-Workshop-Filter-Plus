@@ -3,6 +3,7 @@
     if (!/\/workshop\/browse\/?$/.test(location.pathname)) return;
     var preferences = {}, frame = null, anchors = null, placeholder = null;
     var discoveryDirty = true, toolbarDirty = true;
+    var toolbarResize = new ResizeObserver(schedule);
     var ignoredUi = 'dialog, [role="dialog"], [aria-modal="true"], [popover], #workshop_item_hover, #global_hover, .wshs-picker';
     var root = document.documentElement;
     function setStyle(node, name, value) {
@@ -19,8 +20,11 @@
     }
     function clear() {
         unpin();
+        toolbarResize.disconnect();
         if (anchors) {
             anchors.search.classList.remove('wshs-sidebar-search');
+            anchors.pane.classList.remove('wshs-sidebar-aligned');
+            anchors.pane.style.removeProperty('--wshs-sidebar-lift');
             Array.prototype.forEach.call(anchors.toolbar.children, function (child) { child.classList.remove('wshs-toolbar-empty'); });
         }
         anchors = null;
@@ -52,8 +56,7 @@
         // Read all children before applying decoration to avoid read/write loops.
         var entries = Array.prototype.map.call(anchors.toolbar.children, function (child) {
             return { node: child, empty: child !== anchors.search && child !== placeholder &&
-                !child.querySelector('.hide-subscribed-button, svg[viewBox="0 0 32 18"]') &&
-                !child.textContent.trim() && child.getBoundingClientRect().width < 1 };
+                child.tagName === 'DIV' && !child.children.length && !child.textContent.trim() };
         });
         entries.forEach(function (entry) { setClass(entry.node, 'wshs-toolbar-empty', entry.empty); });
     }
@@ -66,10 +69,12 @@
             discoveryDirty = false;
             var next = discover();
             if (!next) { clear(); return; }
-            if (!anchors || anchors.pane !== next.pane || anchors.body !== next.body || anchors.search !== next.search || anchors.toolbar !== next.toolbar) {
+            var changed = !anchors || anchors.pane !== next.pane || anchors.body !== next.body || anchors.search !== next.search || anchors.toolbar !== next.toolbar;
+            if (changed) {
                 clear(); toolbarDirty = true;
             }
             anchors = next;
+            if (changed) { toolbarResize.observe(anchors.toolbar); toolbarResize.observe(anchors.search); }
             setClass(anchors.search, 'wshs-sidebar-search', true);
         }
         if (!anchors) return;
@@ -85,6 +90,14 @@
         setStyle(anchors.search, '--wshs-search-width', pane.width + 'px');
         setStyle(anchors.search, '--wshs-search-before', before + 'px');
         setStyle(anchors.search, '--wshs-search-after', after + 'px');
+        // The sidebar starts below search, independently of how many rows the
+        // controls need beside it. Keep the native results below those controls.
+        var searchBox = anchors.search.getBoundingClientRect();
+        var toolbarBox = anchors.toolbar.getBoundingClientRect();
+        var toolbarHeight = toolbarBox.height;
+        var searchSlot = placeholder && !placeholder.hidden ? placeholder.getBoundingClientRect() : searchBox;
+        setStyle(anchors.pane, '--wshs-sidebar-lift', Math.min(0, searchSlot.bottom - toolbarBox.bottom) + 'px');
+        setClass(anchors.pane, 'wshs-sidebar-aligned', true);
         if (!preferences.pinnedSidebar) { unpin(); return; }
         setClass(anchors.pane, 'wshs-sidebar-pane', true); setClass(anchors.body, 'wshs-sidebar-body', true);
         if (!placeholder) {
@@ -92,10 +105,9 @@
             anchors.search.insertAdjacentElement('afterend', placeholder);
         }
         var fixed = anchors.search.classList.contains('wshs-search-fixed');
-        var searchBox = anchors.search.getBoundingClientRect();
         var slot = fixed ? placeholder.getBoundingClientRect() : searchBox;
         var height = searchBox.height;
-        var toolbarHeight = anchors.toolbar.classList.contains('wshs-pinned-filter-bar') ? anchors.toolbar.getBoundingClientRect().height : 0;
+        var pinnedToolbarHeight = anchors.toolbar.classList.contains('wshs-pinned-filter-bar') ? toolbarHeight : 0;
         var shouldFix = slot.top <= 12;
         if (shouldFix) {
             setStyle(placeholder, 'width', pane.width + 'px'); setStyle(placeholder, 'height', height + 'px');
@@ -104,7 +116,7 @@
         }
         setClass(anchors.search, 'wshs-search-fixed', shouldFix);
         if (placeholder.hidden !== !shouldFix) placeholder.hidden = !shouldFix;
-        setStyle(anchors.pane, '--wshs-sidebar-top', (Math.max(height, toolbarHeight) + 24) + 'px');
+        setStyle(anchors.pane, '--wshs-sidebar-top', (Math.max(height, pinnedToolbarHeight) + 24) + 'px');
     }
     function schedule() { if (frame === null) frame = requestAnimationFrame(sync); }
     function containsAnchorNode(node, selector) {

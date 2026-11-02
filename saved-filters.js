@@ -25,6 +25,24 @@
         return;
     }
     var collectionPage = detailsPage && !!document.querySelector('.subscribeCollection');
+    if (detailsPage && !collectionPage) {
+        // Streamed or delayed native collection controls can arrive after
+        // DOMContentLoaded. Do not permanently classify that page as mod detail.
+        // Inspect only added subtrees and stop after success or one minute.
+        var collectionObserver = new MutationObserver(function (changes) {
+            var appeared = changes.some(function (change) {
+                return Array.prototype.some.call(change.addedNodes, function (node) {
+                    return node.nodeType === 1 && (node.matches('.subscribeCollection') || node.querySelector('.subscribeCollection'));
+                });
+            });
+            if (!appeared || !document.querySelector('.subscribeCollection')) return;
+            collectionObserver.disconnect(); clearTimeout(collectionDeadline);
+            initSavedFilters();
+        });
+        collectionObserver.observe(document, {childList:true,subtree:true});
+        var collectionDeadline = setTimeout(function () { collectionObserver.disconnect(); }, 60000);
+        return;
+    }
     if (!browsePage && !collectionPage) return;
     if (collectionPage) document.documentElement.classList.add('wshs-collection-page');
 

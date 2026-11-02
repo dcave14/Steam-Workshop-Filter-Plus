@@ -11,8 +11,21 @@
 .wshs-search-placeholder[hidden]{display:none!important}
 .wshs-page-result-count{display:inline-block;color:inherit;font:inherit;opacity:.9;padding:0 6px 0 0}
 .wshs-page-result-count::before{content:'·';margin-right:8px}
-.wshs-toolbar-reset-slot{display:flex;align-items:center;justify-content:flex-start;flex-shrink:0}
+.wshs-toolbar-reset-slot{display:flex;align-items:center;justify-content:flex-start;flex-shrink:0;width:38px;height:38px}
 .wshs-toolbar-reset{flex:none;width:38px;height:38px;padding:0;border-radius:0;justify-content:center;font-size:18px;line-height:1;text-align:center}
 .wshs-toolbar-reset:focus-visible{outline:2px solid #dfe3e6;outline-offset:2px}
+.wshs-search-controls{display:flex!important;align-items:stretch;gap:4px;min-width:0;width:var(--wshs-search-width,250px);max-width:100%}
+.wshs-search-controls>form{flex:1;min-width:0;width:0}
+.wshs-search-controls>[role="button"],.wshs-search-controls>button{flex:none;align-self:stretch;height:auto}
+.wshs-search-controls>.wshs-toolbar-reset-slot{width:var(--wshs-search-action-width,36px);height:auto;align-items:stretch}
+.wshs-search-controls .wshs-toolbar-reset{width:100%;height:auto;min-width:0;min-height:0}
+@media(max-width:999px){
+    .wshs-search-controls,.wshs-search-slot{order:-2;flex:0 0 min(var(--wshs-mobile-search-width,250px),100%)!important;width:min(var(--wshs-mobile-search-width,250px),100%)!important;min-width:0!important;margin:0 auto 4px 0!important}
+    .wshs-apply-filters-slot{order:-1}
+    [data-wshs-sidebar-position="right"] .wshs-search-controls,[data-wshs-sidebar-position="right"] .wshs-search-slot{order:-1;margin:0 0 4px auto!important}
+    [data-wshs-sidebar-position="right"] .wshs-apply-filters-slot{order:-2}
+    .wshs-search-slot>.wshs-search-controls{margin:0!important}
+}
+.wshs-sidebar-aligned{margin-top:var(--wshs-sidebar-lift,0px)!important}
 .wshs-pinned-filter-bar{position:fixed!important;top:12px!important;left:var(--wshs-bar-left)!important;width:var(--wshs-bar-width)!important;margin:0!important;box-sizing:border-box;z-index:110;background:transparent!important;box-shadow:none!important}
 .wshs-filter-bar-placeholder{box-sizing:border-box;pointer-events:none}
