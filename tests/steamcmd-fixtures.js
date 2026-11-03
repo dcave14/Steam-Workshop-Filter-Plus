@@ -16,9 +16,11 @@ const steamCss = `body{margin:0;background:#1b2838;color:#acb2b8;font:14px Arial
 .qv:hover{color:#fff}
 .aspectratio_16x9{aspect-ratio:16/9;background:#070707}.aspectratio_16x9 a{display:block;height:100%}`;
 
+const escape = text => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 function card(id, title) {
     return `<div class="card Panel"><div class="aspectratio_16x9"><a href="${link(id)}"><img alt="" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="></a></div>` +
-        `<div class="details"><div class="stars">★★★★★</div><div class="title"><a href="${link(id)}">${title}</a></div>` +
+        `<div class="details"><div class="stars">★★★★★</div><div class="title"><a href="${link(id)}">${escape(title)}</a></div>` +
         `<div class="author"><a href="/profiles/76561198000000000/myworkshopfiles?appid=${APP}">By Fixture Creator</a></div>` +
         `<div class="actions"><div class="qv Panel" role="button" tabindex="0">${magnifier}</div></div></div></div>`;
 }
@@ -38,6 +40,14 @@ function item(id, title, required, options = {}) {
         `<div class="workshopItemDescription">Fixture description</div>${requiredHtml}<div style="height:1500px"></div></body></html>`;
 }
 
+// Steam's "Linked collections" block: heading, then a .collections grid of
+// .workshopItem tiles (preview link, title link, item count).
+function linkedSection(linked) {
+    if (!linked || !linked.length) return '';
+    const tiles = linked.map(id => `<div class="workshopItem"><a href="${link(id)}"><div class="workshopItemPreviewHolder"><img class="workshopItemPreviewImage" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="></div></a><a href="${link(id)}"><div class="workshopItemTitle">Linked collection ${id}</div></a><div class="workshopCollectionNumChildren">Items</div></div>`).join('');
+    return `<div class="collection"><div class="childrenTitle">Linked collections (${linked.length})</div><div class="collectionChildren_wrap"><div class="collections">${tiles}<div style="clear: left"></div></div></div></div>`;
+}
+
 // Classic collection page with native item controls. delayControls mounts
 // the controls after load, as Steam sometimes does.
 function collection(id, ids, options = {}) {
@@ -47,7 +57,7 @@ function collection(id, ids, options = {}) {
     return `<!doctype html><html><head><meta charset="utf-8"><title>Steam Workshop::Fixture collection</title><style>body{background:#1b2838;color:#c7d5e0;font:14px Arial;margin:30px}.general_btn{display:inline-block;padding:7px 9px;background:#314353}.workshopItemControlCtn{display:inline-block}.collectionItem{display:flex;border-bottom:1px solid #333}.workshopItem,.workshopItemPreviewHolder,.workshopItemPreviewImage{width:60px;height:60px}.collectionItemDetails{flex:1;margin:0 10px}.subscribeCollection,.collectionChildren{width:900px}</style></head><body>` +
         `<div class="workshopItemTitle">${options.title || 'Fixture collection'}</div>${mount}` +
         `<div class="subscribeCollection"><a class="general_btn subscribe" onclick="SubscribeCollection( '${id}', '${APP}' );"><span class="subscribeText">Subscribe to all</span></a><span class="general_btn subscribe">Unsubscribe from all</span><span class="general_btn subscribe">Save to Collection</span><div style="clear: right"></div></div>` +
-        `<div class="workshopItemDescriptionTitle">Items (${ids.length})</div><div class="collectionChildren">${rows}</div></body></html>`;
+        `<div class="workshopItemDescriptionTitle">Items (${ids.length})</div><div class="collectionChildren">${rows}</div>${linkedSection(options.linked)}</body></html>`;
 }
 
 module.exports = { APP, browse, item, collection };

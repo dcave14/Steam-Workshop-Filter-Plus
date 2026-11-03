@@ -4,6 +4,9 @@
 (function () {
     'use strict';
     var PER_LINE = 100, DEPENDENCY_LIMIT = 500, SVG_NS = 'http://www.w3.org/2000/svg';
+    // RimOxide's built-in browser marks the page and intercepts this link
+    // before any request; elsewhere the .invalid host can never resolve.
+    var RIMOXIDE_APP = '294100', RIMOXIDE_LIMIT = 2500, RIMOXIDE_URL = 'https://download.rimoxide.invalid/steamcmd';
     var enabled = false, cardButton = null, itemButton = null, collectionButton = null;
     var popover = null, parts = null, state = null, anchor = null;
     var cardList = null, cardIds = new WeakMap();
@@ -143,7 +146,20 @@
         });
         parts.depsLine = node('div', 'wshs-steamcmd-deps-line');
         parts.depsLine.append(parts.depsRow, parts.retry);
-        parts.copy = button('wshs-steamcmd-primary', 'Copy command', async function () {
+        // Collections: mods in linked collections, followed through their links.
+        parts.linked = node('input'); parts.linked.type = 'checkbox'; parts.linked.checked = true;
+        parts.linked.addEventListener('change', render);
+        parts.linkedText = node('span');
+        parts.linkedRow = node('label', 'wshs-steamcmd-deps');
+        parts.linkedRow.append(parts.linked, parts.linkedText);
+        parts.linkedRetry = button('wshs-steamcmd-retry', 'Retry', function () {
+            if (!state) return;
+            window.WSHSLinkedCollections.tree(state.id, true);
+            render();
+        });
+        parts.linkedLine = node('div', 'wshs-steamcmd-deps-line wshs-steamcmd-linked-line');
+        parts.linkedLine.append(parts.linkedRow, parts.linkedRetry);
+        parts.copy = button('wshs-steamcmd-primary wshs-steamcmd-copy', 'Copy command', async function () {
             var lines = currentLines();
             if (lines.length) flash(parts.copy, await copyText(lines.join('\n')) ? 'Copied' : 'Copy failed');
         });
@@ -153,8 +169,15 @@
             saveFile('steamcmd-' + state.appId + '-' + state.id + '.bat', batchFile(state.appId, ids, state.title));
             flash(parts.save, 'Saved');
         });
-        parts.buttons.append(parts.copy, parts.save);
-        popover.append(parts.title, parts.lead, parts.summary, parts.code, parts.depsLine, parts.error, parts.buttons, parts.note);
+        parts.rimoxide = button('wshs-steamcmd-primary wshs-steamcmd-rimoxide', 'Download in RimOxide', function () {
+            // The marker is read at click time: RimOxide's script and this one load in either order.
+            if (!rimoxideReady()) { render(); return; }
+            var ids = currentIds();
+            window.open(RIMOXIDE_URL + '?appid=' + RIMOXIDE_APP + '&ids=' + ids.join(',') + '&title=' + encodeURIComponent(state.title.slice(0, 200)), '_blank', 'noopener');
+            flash(parts.rimoxide, 'Opening RimOxide…');
+        });
+        parts.buttons.append(parts.rimoxide, parts.copy, parts.save);
+        popover.append(parts.title, parts.lead, parts.summary, parts.code, parts.depsLine, parts.linkedLine, parts.error, parts.buttons, parts.note);
         document.body.appendChild(popover);
         document.addEventListener('pointerdown', function (event) {
             if (!popover.hidden && !popover.contains(event.target) && !(anchor && anchor.contains(event.target))) close(false);
@@ -162,15 +185,41 @@
         document.addEventListener('keydown', function (event) { if (event.key === 'Escape' && !popover.hidden) close(true); });
         window.addEventListener('resize', function () { if (!popover.hidden) place(); });
         if (window.WSHSDependencies) window.WSHSDependencies.onChange(function () { if (!popover.hidden && state && state.withDeps) render(); });
+        if (window.WSHSLinkedCollections) window.WSHSLinkedCollections.onChange(function () { if (!popover.hidden && state && state.withLinked) render(); });
+        // RimOxide may mark the page after the popover opened.
+        new MutationObserver(function () { if (!popover.hidden) render(); })
+            .observe(document.documentElement, { attributes: true, attributeFilter: ['data-rimoxide-host'] });
     }
 
     function currentIds() {
         if (!state || state.error) return [];
+        if (state.withLinked) return parts.linked.checked && state.linkedExtra ? state.ids.concat(state.linkedExtra) : state.ids;
         if (!state.withDeps || !parts.deps.checked) return state.ids;
         return state.ids.concat(state.closure ? state.closure.extra : []);
     }
 
+    // Linked mods not already listed, in visit order, through the same saved
+    // filters as this collection's rows.
+    function linkedExtra(tree) {
+        var seen = new Set(state.ids), extra = [], filters = window.WSHSSavedFilters, excluded = 0;
+        tree.collections.forEach(function (collection) {
+            collection.rows.forEach(function (row) {
+                if (seen.has(row.id)) return;
+                seen.add(row.id);
+                if (filters && filters.passes(row.root, row.id) === false) { excluded++; return; }
+                extra.push(row.id);
+            });
+        });
+        return { ids: extra, excluded: excluded };
+    }
+
     function currentLines() { var ids = currentIds(); return ids.length ? commandLines(state.appId, ids) : []; }
+
+    function rimoxideReady() {
+        var ids = currentIds();
+        return document.documentElement.dataset.rimoxideHost === '1' && state && state.appId === RIMOXIDE_APP &&
+            ids.length > 0 && ids.length <= RIMOXIDE_LIMIT;
+    }
 
     function setText(target, text) { if (target.textContent !== text) target.textContent = text; }
 
@@ -187,6 +236,18 @@
             parts.deps.disabled = !count;
             parts.retry.hidden = c.waiting || !c.failed.length;
         }
+        parts.linkedLine.hidden = !state.withLinked;
+        if (state.withLinked) {
+            var tree = window.WSHSLinkedCollections.tree(state.id), more = linkedExtra(tree), n = tree.collections.length;
+            state.linkedWaiting = tree.waiting > 0;
+            state.linkedExtra = more.ids;
+            setText(parts.linkedText, tree.waiting ? 'Checking linked collections… ' + n + ' read, ' + tree.waiting + ' to go' :
+                n ? 'Include ' + n + ' linked ' + (n === 1 ? 'collection' : 'collections') + ' (+' + more.ids.length + (more.ids.length === 1 ? ' mod' : ' mods') + (more.excluded ? ', ' + more.excluded + ' left out by saved filters' : '') + ')' :
+                'Linked collections could not be read');
+            if (!tree.waiting && n && tree.failed.length) parts.linkedText.textContent += ' · ' + tree.failed.length + ' could not be read';
+            parts.linked.disabled = !more.ids.length;
+            parts.linkedRetry.hidden = !!tree.waiting || !tree.failed.length;
+        }
         parts.error.hidden = !state.error;
         setText(parts.error, state.error || '');
         var ids = currentIds(), lines = currentLines();
@@ -196,9 +257,17 @@
         if (ids.length > 3) shown = commandLines(state.appId, ids.slice(0, 2))[0].replace(/ \+quit$/, ' … +quit');
         setText(parts.code, shown);
         parts.code.hidden = !shown;
-        parts.copy.disabled = parts.save.disabled = !lines.length;
+        // A partial list is never handed out while ticked lookups are running.
+        var loading = (state.withDeps && parts.deps.checked && state.closure && state.closure.waiting) ||
+            (state.withLinked && parts.linked.checked && state.linkedWaiting);
+        parts.copy.disabled = parts.save.disabled = parts.rimoxide.disabled = !lines.length || !!loading;
+        // Inside RimOxide its own download preview replaces copy and .bat.
+        var rimoxide = rimoxideReady();
+        parts.rimoxide.hidden = !rimoxide;
+        parts.copy.hidden = parts.save.hidden = rimoxide;
         if (parts.copy.textContent !== 'Copied' && parts.copy.textContent !== 'Copy failed') setText(parts.copy, lines.length > 1 ? 'Copy ' + lines.length + ' commands' : 'Copy command');
-        setText(parts.note, (lines.length > 1 ? 'Each command downloads up to ' + PER_LINE + ' items. ' : '') +
+        setText(parts.note, rimoxide ? 'Opens RimOxide’s SteamCMD download preview with ' + ids.length + (ids.length === 1 ? ' mod.' : ' mods.') :
+            (lines.length > 1 ? 'Each command downloads up to ' + PER_LINE + ' items. ' : '') +
             'Files save to steamapps/workshop/content/' + state.appId + '/ in your SteamCMD folder. Some games don’t allow anonymous downloads.');
         place();
     }
@@ -219,7 +288,7 @@
         if (anchor) anchor.classList.remove('wshs-steamcmd-open');
         anchor = target; anchor.classList.add('wshs-steamcmd-open'); anchor.setAttribute('aria-expanded', 'true');
         state = Object.assign({ requested: new Set(), closure: null }, data);
-        parts.deps.checked = true;
+        parts.deps.checked = true; parts.linked.checked = true;
         popover.hidden = false;
         render();
         parts.copy.focus({ preventScroll: true });
@@ -280,7 +349,11 @@
             data.ids = Array.from(new Set(Array.from(document.querySelectorAll('.collectionItem .collectionItemDetails > a')).map(function (a) { return itemId(a.href); }).filter(Boolean)));
             data.summary = 'All ' + data.ids.length + ' mods';
         }
-        if (!data.error && !data.ids.length) data.error = 'No mods left after saved filters.';
+        // A hub collection can hold nothing but linked collections.
+        data.linked = window.WSHSLinkedCollections ? window.WSHSLinkedCollections.ids().filter(function (id) { return id !== args[1]; }) : [];
+        data.withLinked = !data.error && data.linked.length > 0;
+        if (!data.error && !data.ids.length && !data.withLinked) data.error = 'No mods left after saved filters.';
+        if (!data.error && !data.ids.length && plan && !plan.excluded.length) data.summary = 'No mods of its own';
         return data;
     }
 

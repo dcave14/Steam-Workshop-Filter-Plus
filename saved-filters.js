@@ -494,6 +494,13 @@
         });
     }
 
+    // Linked collections' mods are read from other pages: title and creator
+    // filters apply; description and required-mod filters pass unless their
+    // data is already cached.
+    if (collectionPage) window.WSHSSavedFilters = {
+        passes: function (root, id) { return passesFilters(root, id, activeFilters()); }
+    };
+
     function prepareLocalData(items, list) {
         var ids = items.map(function (item) { return item.id; }).filter(Boolean);
         var descriptions = includeDescriptions && list.some(function (f) { return f.kind === 'keyword'; });

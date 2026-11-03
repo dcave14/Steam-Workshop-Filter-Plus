@@ -5,7 +5,7 @@ const fs=require('fs');const os=require('os');const path=require('path');
 const {launch,closeBrowser,wait}=require('./browser-helpers');
 const ITEM='2023507013',HARMONY='2009463077',COLLECTION=process.argv.find(a=>a.startsWith('--collection-id='))?.split('=')[1]||'3826899645';
 let checks=0;function check(name,value){assert.ok(value,name);checks++;console.log('PASS '+name);}
-async function popover(p){await p.waitForSelector('.wshs-steamcmd-pop:not([hidden])');return p.$eval('.wshs-steamcmd-pop',n=>({code:n.querySelector('.wshs-steamcmd-code').textContent,deps:n.querySelector('.wshs-steamcmd-deps-line').hidden?null:n.querySelector('.wshs-steamcmd-deps span').textContent,summary:n.querySelector('.wshs-steamcmd-summary').textContent,error:n.querySelector('.wshs-steamcmd-error').hidden?'':n.querySelector('.wshs-steamcmd-error').textContent,copy:n.querySelector('.wshs-steamcmd-primary').textContent,rect:n.getBoundingClientRect().toJSON()}));}
+async function popover(p){await p.waitForSelector('.wshs-steamcmd-pop:not([hidden])');return p.$eval('.wshs-steamcmd-pop',n=>({code:n.querySelector('.wshs-steamcmd-code').textContent,deps:n.querySelector('.wshs-steamcmd-deps-line').hidden?null:n.querySelector('.wshs-steamcmd-deps span').textContent,summary:n.querySelector('.wshs-steamcmd-summary').textContent,error:n.querySelector('.wshs-steamcmd-error').hidden?'':n.querySelector('.wshs-steamcmd-error').textContent,copy:n.querySelector('.wshs-steamcmd-copy').textContent,rect:n.getBoundingClientRect().toJSON()}));}
 async function visit(p,url){const r=await p.goto(url,{waitUntil:'domcontentloaded'});if(r.status()===429)throw Error('Steam rate limit (429) on '+url+'. Wait a few minutes and rerun.');}
 async function clipboard(p){return p.evaluate(()=>navigator.clipboard.readText());}
 (async()=>{const b=await launch(undefined,{presentationPreferences:{steamcmdButtons:true}});
@@ -39,7 +39,7 @@ try{
  check('Card: command uses the page app ID and card item',pop.code.includes('+login anonymous +workshop_download_item 294100 '+cardId)&&pop.code.endsWith('+quit'));
  check('Card: required mods are resolved',/required mod|No required mods|could not be checked/.test(pop.deps));
  check('Card: popover fits the viewport',pop.rect.left>=0&&pop.rect.right<=1400&&pop.rect.top>=0);
- await p.click('.wshs-steamcmd-primary');await wait(200);
+ await p.click('.wshs-steamcmd-copy');await wait(200);
  check('Card: copy writes the command',(await clipboard(p)).startsWith('steamcmd +login anonymous +workshop_download_item 294100 '+cardId));
  const before=await p.$eval('.wshs-steamcmd-pop',n=>n.style.left+','+n.style.top);
  const away=await p.evaluateHandle(()=>{const icons=document.querySelectorAll('svg.SVGIcon_MagnifyingGlass');let n=icons[2];while(n&&!(n.querySelector&&n.querySelector('img')&&n.querySelector('a[href*="filedetails"]')))n=n.parentElement;return n;});
@@ -74,8 +74,18 @@ try{
  await wait(1500);await p.click('.wshs-steamcmd-collection');pop=await popover(p);
  const rows=await p.$$eval('.collectionItem .collectionItemDetails > a',as=>[...new Set(as.map(a=>/[?&]id=(\d+)/.exec(a.href)[1]))]);
  check('Collection: command covers the collection, no required-mod option',pop.deps===null&&!pop.error&&pop.summary.includes(String(rows.length))&&pop.code.includes('294100 '+rows[0]));
- await p.click('.wshs-steamcmd-primary');await wait(200);const copied=await clipboard(p);
+ await p.click('.wshs-steamcmd-copy');await wait(200);const copied=await clipboard(p);
  check('Collection: copied commands list every mod once',rows.every(id=>copied.includes(' '+id+' ')||copied.includes(' '+id+'\n'))&&copied.split('+workshop_download_item').length-1===rows.length);
+ // Ferny's Progression Modpack links its Content and Cosmetics parts, which link back.
+ await visit(p,'https://steamcommunity.com/sharedfiles/filedetails/?id=3521297585');
+ await p.waitForSelector('.wshs-steamcmd-collection',{timeout:30000});await wait(2500);await p.click('.wshs-steamcmd-collection');
+ await p.waitForFunction(()=>!/Checking linked/.test(document.querySelector('.wshs-steamcmd-linked-line span')?.textContent||'Checking linked'),{timeout:90000});
+ const ferny=await p.evaluate(()=>({text:document.querySelector('.wshs-steamcmd-linked-line span').textContent,own:document.querySelectorAll('.collectionItem').length}));
+ const fernyExtra=Number((/\(\+(\d+) mods/.exec(ferny.text)||[])[1]);
+ check('Ferny: both linked parts found and read',/^Include 2 linked collections \(\+\d+ mods/.test(ferny.text)&&fernyExtra>100,ferny);
+ await p.click('.wshs-steamcmd-copy');await wait(300);const fernyIds=(await clipboard(p)).match(/(?<=294100 )\d+/g)||[];
+ check('Ferny: one list of every mod across the three parts, no repeats',fernyIds.length===new Set(fernyIds).size&&fernyIds.length>=ferny.own+fernyExtra-5&&fernyIds.length<=2500,{count:fernyIds.length,own:ferny.own,extra:fernyExtra});
+ await p.keyboard.press('Escape');
  // Settings toggle
  const target=b.targets().find(t=>t.url().startsWith('chrome-extension://'));const popup=await b.newPage();
  await popup.goto('chrome-extension://'+new URL(target.url()).hostname+'/popup.html');await popup.waitForFunction(()=>!document.querySelector('#steamcmd-buttons').disabled);

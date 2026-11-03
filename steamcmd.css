@@ -37,6 +37,7 @@
 .wshs-steamcmd-secondary{background:#5a6370}
 .wshs-steamcmd-secondary:hover{background:#6b7581}
 .wshs-steamcmd-action:disabled{opacity:.45;cursor:default}
+.wshs-steamcmd-action[hidden]{display:none}
 .wshs-steamcmd-action:focus-visible{outline:1px solid #fff;outline-offset:1px}
 .wshs-steamcmd-note{margin-top:8px!important;font-size:11px;color:#8f98a0}
 .wshs-steamcmd-clip{position:fixed;top:0;left:0;width:1px;height:1px;opacity:0}

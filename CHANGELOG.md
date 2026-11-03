@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- SteamCMD on collections includes **linked collections**, followed through their own links and loops (Ferny's Progression Modpack with its Content and Cosmetics parts: 1,484 mods in one list). Repeats are removed, title and creator saved filters apply, a hub with no mods of its own works, and unreadable or rate-limited collections are reported with Retry. Copy, .bat and RimOxide wait until every linked collection is read
+- SteamCMD inside RimOxide: when RimOxide's built-in browser marks the page, the popover shows **Download in RimOxide** instead of Copy command / Save .bat, and hands the same mods (required mods included when ticked, saved filters applied) to RimOxide's download preview. RimWorld only, up to 2,500 mods; normal browsers are unchanged
+
 ## 1.5.2 (2026-11-03)
 - Optional **SteamCMD downloads** for owners of GOG and DRM-free copies, off by default (Settings → Downloads)
 - Workshop cards get a SteamCMD button beside Quick View; item pages get one beside Subscribe; collections get one in the item controls

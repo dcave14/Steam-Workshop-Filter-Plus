@@ -213,6 +213,25 @@ command-line limit. Files land in `steamapps/workshop/content/<app>/` in the Ste
 folder. Some games don't allow anonymous Workshop downloads; SteamCMD reports a failure
 for those.
 
+**Linked collections:** when a collection lists **Linked collections** (Ferny's
+Progression Modpack links its Content and Cosmetics parts), the popover offers
+**Include N linked collections (+M mods)**, ticked by default. Their pages are read when
+the popover opens, two at a time, and their own links are followed; each collection is
+read once, even when they link back to each other. Mods already listed are not repeated.
+Title and creator saved filters apply to linked mods; description and required-mod
+filters apply only where that data is already loaded. Copy, .bat and RimOxide wait until
+every linked collection is read. Removed or rate-limited collections are reported, with
+**Retry**.
+
+**Inside RimOxide:** RimOxide's built-in browser marks Steam pages with
+`data-rimoxide-host="1"` on `<html>`. When that marker is present at click time on a
+RimWorld page, the popover shows **Download in RimOxide** instead of Copy and .bat. It
+opens `https://download.rimoxide.invalid/steamcmd?appid=294100&ids=…&title=…` with the
+same mods the command would list; RimOxide intercepts that link before any request and
+opens its own SteamCMD download preview. The `.invalid` address can never resolve, so
+in any other browser the link fails harmlessly. Over 2,500 mods, or for other games,
+Copy and .bat stay.
+
 ## Collection sizes
 
 Collection sizes appear beside the item count: **Total** sums all listed mods, and **After
@@ -268,6 +287,7 @@ Measured changes and resource limits are in [perf/REPORT.md](../perf/REPORT.md).
 ├── search-terms-hook.js     Applies saved keywords to Steam's search requests
 ├── saved-filters.css        Saved-filter sidebar and picker styles
 ├── steamcmd.js / .css       Optional SteamCMD download commands for mods and collections
+├── linked-collections.js    Mods in a collection's linked collections, for SteamCMD
 ├── styles.css               Styles for the controls and dropdowns
 ├── icons/                   Extension icons (16, 32, 48, 128) and the full-size source artwork
 ├── build.js                 Builds the Chrome and Firefox packages into dist/

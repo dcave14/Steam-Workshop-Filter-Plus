@@ -2,6 +2,35 @@
 
 How this project is tested.
 
+## Linked collections (unreleased)
+
+`tests/steamcmd-edge-test.js` (73 checks) adds fixtures in Steam's real markup
+(`.childrenTitle` then a `.collections` grid): nesting (L1 -> L3 -> L4), a loop
+(L1 <-> L2), a mod repeated across collections, a saved filter on a linked mod,
+each linked page fetched once and reused on reopen, the open collection never
+fetched, unticking, RimOxide ids equal to the command, a hub with no mods of its
+own, rate-limited and removed collections with Retry, Copy disabled while
+reading, and the classic layout (overhaul off). It fails with
+`linked-collections.js` emptied. `tests/steamcmd-test.js` (live) checks Ferny's
+Progression Modpack: both linked parts read and one list without repeats
+(863 + 427 + 194 = 1,484 mods on 2026-11-03).
+
+## RimOxide hand-off (unreleased)
+
+`tests/steamcmd-edge-test.js` (now 60 checks) adds: no marker keeps Copy/.bat;
+the marker set after load shows only **Download in RimOxide**; the opened link
+has `appid=294100`, the command's ids in order (required mods included, or
+dropped when unticked) and the title; adding or removing the marker while the
+popover is open switches the buttons; removing it just before the click opens
+nothing; other games and collections over 2,500 mods keep Copy/.bat; a filtered
+collection sends exactly the ids its copied command lists. The suite fails on
+the 1.5.2 `steamcmd.js`.
+
+Manual harness: `node tests/rimoxide-sim.js` opens a test Chrome with the
+extension that sets the marker on every page and shows the appid, ids and
+title a RimOxide link carries; `--plain` omits the marker, `--verify` runs a
+headless self-check.
+
 ## 1.5.2 edge-case and leak guards
 
 Three suites guard against details that broke silently. Each was proven by
