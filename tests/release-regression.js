@@ -16,7 +16,12 @@ let suites=[
  ['group-visibility-test.js'],['group-visibility-test.js','--firefox'],
  ['collection-picker-motion-test.js'],['collection-picker-motion-test.js','--firefox'],
  ['geometry-fallback-work-test.js'],['collection-picker-work-test.js'],['collection-picker-work-test.js','--firefox'],
- ['quick-view-filters-test.js']
+ ['quick-view-filters-test.js'],
+ // Edge cases and leak guards on offline fixtures.
+ ['steamcmd-edge-test.js'],['native-style-leak-test.js'],
+ // Live Steam: page types, in-page navigation, SteamCMD on real markup. Steam
+ // rate-limits anonymous sessions; a 429 failure means wait and rerun --only.
+ ['page-sweep-test.js'],['steamcmd-test.js']
 ];
 const root=path.resolve(__dirname,'..'),out=path.join(__dirname,'out','release-1.5.0');fs.mkdirSync(out,{recursive:true});
 const only=process.argv.find(a=>a.startsWith('--only='))?.slice(7);

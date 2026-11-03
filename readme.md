@@ -27,6 +27,7 @@ A Chrome and Firefox extension that adds filters to Steam Workshop pages and col
 - **Subscribe to all** that skips mods your saved filters exclude
 - **Compact layout**, left or right sidebar, pinning and reduced motion
 - **75 or 100 mods per page**
+- Optional **SteamCMD downloads** for GOG and DRM-free copies: copy a command or save a `.bat` for a mod and its required mods, or a filtered collection
 
 ## Install
 

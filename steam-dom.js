@@ -245,12 +245,15 @@
         return null;
     }
 
+    // Browse pages only: Steam's client-side navigation to About keeps this
+    // script alive, and the Browse nav dropdown also carries the chevron.
     function getSortButton() {
+        if (!/\/workshop\/browse\/?$/.test(location.pathname)) return null;
         var scope = getControlArea();
-        var result = findSortButtonIn(scope);
+        var result = findSortButtonIn(scope, true);
         if (result) return result;
-        return findSortButtonIn(document.getElementById('CommunityTemplate')) ||
-            findSortButtonIn(document);
+        return findSortButtonIn(document.getElementById('CommunityTemplate'), false) ||
+            findSortButtonIn(document, false);
     }
 
     // The native sort dropdown is a div[role="button"][tabindex] containing the
@@ -258,7 +261,8 @@
     // contains the 32x18 sort glyph is preferred before falling back to a
     // chevron-only match. Its parent is the fit-content wrapper used as the
     // insertion anchor. No hashed class names are used as selectors.
-    function findSortButtonIn(scope) {
+    // A chevron-only match is trusted only inside the filter control row.
+    function findSortButtonIn(scope, allowChevronOnly) {
         if (!scope) return null;
         var buttons = scope.querySelectorAll('div[role="button"][tabindex]');
         var chevronOnly = null;
@@ -271,7 +275,7 @@
             if (button.querySelector('svg[viewBox="0 0 32 18"]')) return entry;
             if (!chevronOnly) chevronOnly = entry;
         }
-        return chevronOnly;
+        return allowChevronOnly ? chevronOnly : null;
     }
 
     // Labels of the native sort popover's options, used by content.js for the

@@ -2,6 +2,50 @@
 
 How this project is tested.
 
+## Edge-case and leak guards (unreleased)
+
+Three suites guard against details that broke silently. Each was proven by
+rerunning it with the old source (`WSHS_SOURCE_OVERLAY=<folder of old files>`)
+and seeing it fail.
+
+- `tests/native-style-leak-test.js` (offline): opens a modal probe dialog and a
+  popover inside every Steam element the extension decorates (cards, details,
+  author and actions rows, collection controls) in Compact + reduced motion +
+  SteamCMD and Comfortable + classic collections, and requires identical
+  geometry and styles to the same probe at `<body>`. Steam mounts Additional
+  Required Items inside a card's actions row; this caught the 24px buttons and
+  the card hover-motion rule stopping dialog animations.
+- `tests/page-sweep-test.js` (live): Discussions, About, Workshop home, item
+  comments and changelog must carry no extension classes, attributes or styles,
+  and their visible controls must match a browser without the extension. Also
+  Browse -> About by Steam's in-page navigation (no reload), and back.
+- `tests/steamcmd-edge-test.js` (offline, 50 checks): default off and toggling
+  without reload; fast pointer sweeps; tooltip timing; popover staying on its
+  card while hovering, scrolling and resizing; toggle, outside and rapid clicks;
+  required-mod chains, cycles, self-reference, slow and rate-limited lookups
+  with Retry; keyboard access; cards replaced or hidden under an open popover;
+  edge and narrow-window placement; clipboard and `.bat` (title injection,
+  CRLF); collections browse; items without Subscribe; collection filters,
+  250-mod splitting, rebuilt and late controls.
+
+All four new suites run in `tests/release-regression.js`. The two live ones can
+hit Steam's 429 after repeated runs; wait a few minutes and use `--only=`.
+
+## SteamCMD downloads (unreleased)
+
+`node tests/steamcmd-test.js` runs live with `steamcmdButtons` on. Workshop
+cards: one persistent button joins Steam's hover actions row before Quick View,
+matches its 30px frame, moves between hovered cards and opens the popover
+without navigating. Item pages: the button sits beside Subscribe at its height;
+Vanilla Expanded Framework resolves Harmony as a required mod, the checkbox
+drops it, and the saved `.bat` holds the same CRLF command. Collections: the
+button joins `#ItemControls`, and the copied commands list each mod once.
+Copy, Escape (focus returns), outside click and the popup toggle (removes and
+restores buttons without reload) are covered. `--collection-id=` picks another
+collection. Steam rate-limits anonymous sessions after repeated runs; a 429
+item page means wait before rerunning. A rate-limited dependency lookup shows
+"Required mods could not be checked" rather than waiting forever.
+
 ## 1.5.1 responsive fixes
 
 The 1.5.1 packages use the tested runtime from `c66db52`, with the manifest

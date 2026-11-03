@@ -74,6 +74,9 @@ function getControlArea() {
     // A streamed collection's review bar can arrive before its action row.
     // Wait for the intended row rather than injecting into that earlier bar.
     if (collectionArea || /\/sharedfiles\/filedetails\/?$/.test(location.pathname)) return collectionArea;
+    // Discussions and About also live under /workshop/ and reuse the legacy
+    // menu classes; the toolbar belongs on browse pages only.
+    if (!onBrowseRoute()) return null;
     const legacyArea = document.querySelector('.workshop_browse_menu_area, .workshop_browse_options, .collectionControls>.workshopItemControls');
     if (legacyArea) return legacyArea;
     if (window.WSHSDom && window.WSHSDom.isNewLayout()) {
@@ -177,6 +180,18 @@ function scheduleCreateButtonsRetry() {
         createButtonsRetryTimer = null;
         createButtons();
     }, Math.max(250, HYDRATION_SETTLE_MS - quietFor));
+}
+
+function onBrowseRoute() {
+    return /\/workshop\/browse\/?$/.test(location.pathname);
+}
+
+// Steam navigates Browse -> About without a reload. Remove the toolbar and
+// return Steam's controls to their own styles when the route changes.
+function leaveBrowseRoute() {
+    if (widthSyncCleanup) { widthSyncCleanup(); widthSyncCleanup = null; }
+    widthSync = null;
+    for (const node of document.querySelectorAll('.wshs-injected-controls, .wshs-toolbar-reset-slot')) node.remove();
 }
 
 function createButtons() {
@@ -617,6 +632,21 @@ function createButtons() {
         }
     });
     let toolbarLayout = null;
+    // Inline styles of Steam's sort button (and its icons and label) before
+    // the first resize, restored when the toolbar is removed.
+    const nativeSortStyles = new Map();
+    function rememberNativeStyles(button) {
+        if (!button) return;
+        for (const node of [button, ...button.querySelectorAll('svg, span')]) {
+            if (!nativeSortStyles.has(node)) nativeSortStyles.set(node, node.getAttribute('style'));
+        }
+    }
+    function restoreNativeStyles() {
+        nativeSortStyles.forEach((style, node) => {
+            if (style === null) node.removeAttribute('style'); else node.setAttribute('style', style);
+        });
+        nativeSortStyles.clear();
+    }
     let geometryFrame = null;
     let lastToolbarMetrics = null;
     let resetSearchRow = null;
@@ -766,6 +796,7 @@ function createButtons() {
             setButtonWidth(button,wide?cell:buttonSlots[index].width,4);
             button.style.height = '';
         }
+        rememberNativeStyles(sort);
         applyUniformFont(sort,font);setButtonWidth(sort,sortWidth,6);sort.style.height = '';
         applyNativeSortAnatomy(sort);
         const sortLineHeight = Math.ceil(parseFloat(font) * 1.2);
@@ -868,6 +899,7 @@ function createButtons() {
     window.addEventListener('resize', scheduleGeometry);
     widthSyncCleanup = () => {
         restoreToolbarLayout();
+        restoreNativeStyles();
         window.removeEventListener('resize', scheduleGeometry);
         if (geometryFrame !== null) cancelAnimationFrame(geometryFrame);
         if (sortResizeObserver) sortResizeObserver.disconnect();
@@ -1067,6 +1099,10 @@ function flushDomWork() {
     domWorkFrame = null;
     const work = pendingDomWork;
     pendingDomWork = 0;
+    if (!onBrowseRoute() && !/\/sharedfiles\/filedetails\/?$/.test(location.pathname)) {
+        if (widthSync || document.querySelector('.wshs-injected-controls')) leaveBrowseRoute();
+        return;
+    }
     if (work === 2) {
         applyFiltersIfNeeded();
     } else if (work === 1 && widthSync) {

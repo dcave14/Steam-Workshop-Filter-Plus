@@ -8,7 +8,11 @@ const BASE_URL = 'https://steamcommunity.com/workshop/browse/?appid=294100&brows
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function launch(chrome, options = {}) {
-    const { useConfiguredService = false, presentationPreferences, sourceOverlay, ...launchOptions } = options;
+    const { useConfiguredService = false, presentationPreferences, ...launchOptions } = options;
+    // WSHS_SOURCE_OVERLAY: run any suite against a folder of older source files,
+    // to check whether a failure or a new check depends on a change.
+    const sourceOverlay = options.sourceOverlay || process.env.WSHS_SOURCE_OVERLAY;
+    delete launchOptions.sourceOverlay;
     const firefox = chrome === 'firefox';
     const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, firefox ? 'dist/firefox/manifest.json' : 'manifest.json'), 'utf8'));
     const files = new Set(['manifest.json', ...Object.values(manifest.icons || {})]);
@@ -30,7 +34,7 @@ async function launch(chrome, options = {}) {
     // Firefox BiDi cannot open moz-extension popups. Seed only presentation
     // preferences in this disposable test copy; no production test bridge.
     if (presentationPreferences) {
-        const allowed = {sidebarPosition:['left','right'],collectionOverhaul:[true,false], pinnedSidebar:[true,false], pinnedWorkshopBar:[true,false], pinnedCollections:[true,false], layoutDensity: ['comfortable', 'compact'], reduceMotion: [true, false], disableCardHover: [true, false], pauseHomepageCarousels: [true, false], freezeAnimatedPreviews: [true, false]};
+        const allowed = {sidebarPosition:['left','right'],collectionOverhaul:[true,false], pinnedSidebar:[true,false], pinnedWorkshopBar:[true,false], pinnedCollections:[true,false], layoutDensity: ['comfortable', 'compact'], reduceMotion: [true, false], disableCardHover: [true, false], pauseHomepageCarousels: [true, false], freezeAnimatedPreviews: [true, false], steamcmdButtons: [true, false]};
         for (const [key, value] of Object.entries(presentationPreferences)) {
             if (!allowed[key]?.includes(value)) throw Error('Invalid presentation test preference: '+key);
         }

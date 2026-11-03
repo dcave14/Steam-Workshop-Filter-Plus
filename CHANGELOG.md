@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+- Optional **SteamCMD downloads** for owners of GOG and DRM-free copies, off by default (Settings → Downloads)
+- Workshop cards get a SteamCMD button beside Quick View; item pages get one beside Subscribe; collections get one in the item controls
+- Copy an anonymous `steamcmd +login anonymous +workshop_download_item` command, or save it as a `.bat`
+- Mods include their required mods, checked recursively; collections follow Subscribe to all, leaving out mods excluded by saved filters
+- Commands over 100 items are split so each stays within Windows' command-line limit
+- Fixed: Steam's **Additional Required Items** dialog, opened from a Workshop card's subscribe button, no longer has its buttons squeezed to 24px
+- Fixed: Workshop **Discussions** no longer gets the filter toolbar, and going from Browse to **About** no longer restyles Steam's Browse menu as the sort button
+- Fixed: **Disable card hover animations** no longer stops animations in Steam dialogs and menus opened from a card
+- SteamCMD: **Retry** for required mods after Steam rate-limits lookups; keyboard users reach the card button from Quick View; the popover closes if Steam replaces or hides its card, and the collection button returns if Steam rebuilds its controls
+
 ## 1.5.1 (2026-11-02)
 - Responsive Workshop controls stay aligned through resizing, sidebar flips and Comfortable / Compact layouts, including the small-window Apply filters button
 - Search, gear and reset share a height, with gear and reset paired and mirrored to the sidebar's outside edge

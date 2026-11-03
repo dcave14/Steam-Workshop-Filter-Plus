@@ -193,6 +193,26 @@ Workshop order is **Hide Subscribed → Ratings → Star Rating → Steam sort**
 grids the controls wrap into equal columns. The collection bottom row is **Hide Subscribed
 → Ratings → Star Rating**. Description search stays in Saved Filters below the phrase box.
 
+## SteamCMD downloads
+
+For owners of GOG and DRM-free copies who can't subscribe through Steam. Turn on
+**SteamCMD downloads** under **Downloads** in the settings popup; it starts off.
+
+- **Workshop cards:** hover a mod; a terminal button appears beside Steam's Quick View.
+- **Mod pages:** a **SteamCMD** button sits beside **Subscribe**.
+- **Collections:** a **SteamCMD** button joins Favorite, Share and Add to Collection.
+
+The popover builds an anonymous command:
+`steamcmd +login anonymous +workshop_download_item <app> <item> ... +quit`.
+**Copy command** puts it on the clipboard; **Save .bat** downloads a Windows script
+to run next to `steamcmd.exe`. Mods include their required mods (checked recursively,
+through the same cache as required-mod filters); untick the box to skip them.
+Collections follow **Subscribe to all**: mods excluded by saved filters or the collection
+search are left out. Commands over 100 items are split so each stays within the Windows
+command-line limit. Files land in `steamapps/workshop/content/<app>/` in the SteamCMD
+folder. Some games don't allow anonymous Workshop downloads; SteamCMD reports a failure
+for those.
+
 ## Collection sizes
 
 Collection sizes appear beside the item count: **Total** sums all listed mods, and **After
@@ -247,6 +267,7 @@ Measured changes and resource limits are in [perf/REPORT.md](../perf/REPORT.md).
 ├── pluralize.js             Bundled pluralize 8.0.0 (MIT; license included in source)
 ├── search-terms-hook.js     Applies saved keywords to Steam's search requests
 ├── saved-filters.css        Saved-filter sidebar and picker styles
+├── steamcmd.js / .css       Optional SteamCMD download commands for mods and collections
 ├── styles.css               Styles for the controls and dropdowns
 ├── icons/                   Extension icons (16, 32, 48, 128) and the full-size source artwork
 ├── build.js                 Builds the Chrome and Firefox packages into dist/

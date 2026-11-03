@@ -22,8 +22,8 @@
                 "*://*.steamcommunity.com/sharedfiles/filedetails/*",
                 "*://*.steamcommunity.com/app/*/workshop/*"
             ],
-            "js": ["api-client.js", "workshop-metadata.js", "collection-descriptions.js", "workshop-dependencies.js", "filter-matching.js", "steam-dom.js", "content.js", "collection-row-align.js", "sort-popover-fit.js", "pluralize.js", "title-word-inflection.js", "saved-filters.js", "collection-sizes.js", "workshop-sidebar.js", "filter-bar-pinning.js", "workshop-appearance.js", "preview-motion.js", "workshop-result-count.js", "collection-layout.js"],
-            "css": ["styles.css", "saved-filters.css", "workshop-sidebar.css", "workshop-appearance.css", "collection-layout.css"],
+            "js": ["api-client.js", "workshop-metadata.js", "collection-descriptions.js", "workshop-dependencies.js", "filter-matching.js", "steam-dom.js", "content.js", "collection-row-align.js", "sort-popover-fit.js", "pluralize.js", "title-word-inflection.js", "saved-filters.js", "collection-sizes.js", "workshop-sidebar.js", "filter-bar-pinning.js", "workshop-appearance.js", "preview-motion.js", "workshop-result-count.js", "collection-layout.js", "steamcmd.js"],
+            "css": ["styles.css", "saved-filters.css", "workshop-sidebar.css", "workshop-appearance.css", "collection-layout.css", "steamcmd.css"],
             "run_at": "document_start"
         },
         {

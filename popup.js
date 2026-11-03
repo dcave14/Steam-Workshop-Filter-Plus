@@ -9,7 +9,8 @@
     var carousels = document.getElementById('pause-home-carousels');
     var previews = document.getElementById('freeze-animated-previews');
     var overhaul = document.getElementById('collection-overhaul');
-    var keys = ['pinnedSidebar', 'pinnedWorkshopBar', 'pinnedCollections', 'sidebarPosition', 'layoutDensity', 'reduceMotion', 'disableCardHover', 'pauseHomepageCarousels', 'freezeAnimatedPreviews', 'collectionOverhaul'];
+    var steamcmd = document.getElementById('steamcmd-buttons');
+    var keys = ['pinnedSidebar', 'pinnedWorkshopBar', 'pinnedCollections', 'sidebarPosition', 'layoutDensity', 'reduceMotion', 'disableCardHover', 'pauseHomepageCarousels', 'freezeAnimatedPreviews', 'collectionOverhaul', 'steamcmdButtons'];
     var preferences = {};
     function render(data) {
         pin.checked = data.pinnedSidebar === true;
@@ -22,6 +23,7 @@
         carousels.checked = data.pauseHomepageCarousels !== false;
         previews.checked = data.freezeAnimatedPreviews !== false;
         overhaul.checked = data.collectionOverhaul !== false;
+        steamcmd.checked = data.steamcmdButtons === true;
         document.getElementById('motion-settings').disabled = !motion.checked;
     }
     async function save(update) {
@@ -29,7 +31,7 @@
         catch (_) { document.getElementById('status').textContent = 'Could not save preferences. Try again.'; }
     }
     chrome.storage.local.get(keys).then(function (data) {
-        preferences = data; render(data); pin.disabled = false; collectionPin.disabled = false; workshopPin.disabled = false; motion.disabled = false; overhaul.disabled = false;
+        preferences = data; render(data); pin.disabled = false; collectionPin.disabled = false; workshopPin.disabled = false; motion.disabled = false; overhaul.disabled = false; steamcmd.disabled = false;
         document.getElementById('position-settings').disabled = false; document.getElementById('density-settings').disabled = false;
     });
     pin.addEventListener('change', function () { save({ pinnedSidebar: pin.checked }); });
@@ -42,6 +44,7 @@
     carousels.addEventListener('change', function () { save({ pauseHomepageCarousels: carousels.checked }); });
     previews.addEventListener('change', function () { save({ freezeAnimatedPreviews: previews.checked }); });
     overhaul.addEventListener('change', function () { save({ collectionOverhaul: overhaul.checked }); });
+    steamcmd.addEventListener('change', function () { save({ steamcmdButtons: steamcmd.checked }); });
     chrome.storage.onChanged.addListener(function (changes, area) {
         if (area !== 'local') return;
         keys.forEach(function (key) { if (changes[key]) preferences[key] = changes[key].newValue; });

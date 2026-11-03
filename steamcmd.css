@@ -1,0 +1,42 @@
+/* SteamCMD downloads. The card button takes Steam's Quick View class, which
+   sizes its frame and svg tile; these rules only add the glyph and states. */
+.wshs-steamcmd-card{cursor:pointer}
+.wshs-steamcmd-card:hover,.wshs-steamcmd-card:focus-visible,.wshs-steamcmd-card.wshs-steamcmd-open{color:#fff}
+.wshs-steamcmd-card.wshs-steamcmd-open svg{background:#67c1f559}
+.wshs-steamcmd-card:focus-visible{outline:1px solid #67c1f5;outline-offset:-2px}
+.wshs-steamcmd-card svg{flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.wshs-steamcmd-tip{position:fixed;z-index:2000;display:none;box-sizing:border-box;max-width:300px;padding:5px 8px;border-radius:2px;background:radial-gradient(62.67% 62.67% at 62.67% 100%,#cfd1d3 0%,#b3b8bc 100%);box-shadow:#00000055 1px 1px 8px,#00000055 2px 2px 16px 1px;color:#17181c;text-shadow:#ffffff4d 1px 1px 2px;font:13px "Motiva Sans","Motiva Sans fallback",Arial,Helvetica,sans-serif;white-space:nowrap;pointer-events:none;user-select:none;opacity:0;transition:opacity .25s}
+.wshs-steamcmd-tip.wshs-steamcmd-tip-shown{display:block}
+.wshs-steamcmd-tip.wshs-steamcmd-tip-visible{opacity:1}
+@media (prefers-contrast:more){.wshs-steamcmd-tip{color:#fff;background:#000;border:1px solid #fff;text-shadow:none}}
+.wshs-steamcmd-item svg,.wshs-steamcmd-collection svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.wshs-steamcmd-row{white-space:nowrap}
+.wshs-steamcmd-item{margin-right:6px;vertical-align:top}
+.wshs-steamcmd-item>span{display:inline-flex!important;align-items:center;gap:6px}
+.wshs-steamcmd-collection>span{display:inline-flex!important;align-items:center;gap:5px}
+.wshs-steamcmd-collection svg{width:14px;height:14px}
+
+.wshs-steamcmd-pop{position:absolute;z-index:1000;box-sizing:border-box;width:320px;max-width:calc(100vw - 16px);padding:10px 12px 12px;background:#3d4450;border-radius:3px;box-shadow:0 0 12px #000000b3;color:#acb2b8;font:12px/1.4 "Motiva Sans",Arial,Helvetica,sans-serif;text-align:left}
+.wshs-steamcmd-pop[hidden]{display:none}
+.wshs-steamcmd-pop p{margin:0}
+.wshs-steamcmd-title{margin-bottom:2px;font-size:14px;color:#fff}
+.wshs-steamcmd-summary{margin-top:6px!important;color:#c6d4df}
+.wshs-steamcmd-code{display:block;margin:8px 0;padding:6px 8px;background:#1b2028;border-radius:2px;color:#c6d4df;font:11px/1.45 Consolas,"Courier New",monospace;word-break:break-all;white-space:normal}
+.wshs-steamcmd-code[hidden],.wshs-steamcmd-deps[hidden],.wshs-steamcmd-error[hidden],.wshs-steamcmd-summary[hidden]{display:none}
+.wshs-steamcmd-deps-line{display:flex;align-items:center;gap:10px;margin:6px 0}
+.wshs-steamcmd-deps-line[hidden],.wshs-steamcmd-retry[hidden]{display:none}
+.wshs-steamcmd-deps{display:flex;align-items:center;gap:6px;cursor:pointer}
+.wshs-steamcmd-action.wshs-steamcmd-retry{padding:0;border:0;background:none;color:#67c1f5;font:inherit;cursor:pointer}
+.wshs-steamcmd-action.wshs-steamcmd-retry:hover,.wshs-steamcmd-action.wshs-steamcmd-retry:focus-visible{color:#fff;text-decoration:underline}
+.wshs-steamcmd-deps input{margin:0;accent-color:#1a9fff}
+.wshs-steamcmd-error{margin:8px 0!important;color:#e4a666}
+.wshs-steamcmd-buttons{display:flex;gap:6px;margin-top:8px}
+.wshs-steamcmd-action{padding:5px 12px;border:0;border-radius:2px;color:#fff;font:inherit;cursor:pointer}
+.wshs-steamcmd-primary{background:linear-gradient(to right,#47bfff,#1a44c2)}
+.wshs-steamcmd-primary:hover{background:linear-gradient(to right,#5cc8ff,#3459d6)}
+.wshs-steamcmd-secondary{background:#5a6370}
+.wshs-steamcmd-secondary:hover{background:#6b7581}
+.wshs-steamcmd-action:disabled{opacity:.45;cursor:default}
+.wshs-steamcmd-action:focus-visible{outline:1px solid #fff;outline-offset:1px}
+.wshs-steamcmd-note{margin-top:8px!important;font-size:11px;color:#8f98a0}
+.wshs-steamcmd-clip{position:fixed;top:0;left:0;width:1px;height:1px;opacity:0}

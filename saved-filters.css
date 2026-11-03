@@ -439,8 +439,11 @@ dialog[open] .wshs-qv-creators a {
     opacity: 1;
 }
 
-.wshs-card-actions [role="button"],
-.wshs-card-actions button {
+/* Only the row's own buttons: Quick View (row > [role=button]) and Subscribe
+   (row > wrapper > button). Steam also mounts dialogs such as Additional
+   Required Items inside this row; their content keeps its native size. */
+.wshs-card-actions > [role="button"],
+.wshs-card-actions > * > button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -450,7 +453,8 @@ dialog[open] .wshs-qv-creators a {
     padding: 2px;
 }
 
-.wshs-card-actions svg {
+.wshs-card-actions > [role="button"] > svg,
+.wshs-card-actions > * > button > svg {
     width: 20px;
     height: 20px;
 }
