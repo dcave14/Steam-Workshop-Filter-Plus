@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.5.2 (2026-11-03)
 - Optional **SteamCMD downloads** for owners of GOG and DRM-free copies, off by default (Settings → Downloads)
 - Workshop cards get a SteamCMD button beside Quick View; item pages get one beside Subscribe; collections get one in the item controls
 - Copy an anonymous `steamcmd +login anonymous +workshop_download_item` command, or save it as a `.bat`

@@ -2,7 +2,7 @@
 
 How this project is tested.
 
-## Edge-case and leak guards (unreleased)
+## 1.5.2 edge-case and leak guards
 
 Three suites guard against details that broke silently. Each was proven by
 rerunning it with the old source (`WSHS_SOURCE_OVERLAY=<folder of old files>`)
@@ -31,7 +31,7 @@ and seeing it fail.
 All four new suites run in `tests/release-regression.js`. The two live ones can
 hit Steam's 429 after repeated runs; wait a few minutes and use `--only=`.
 
-## SteamCMD downloads (unreleased)
+## 1.5.2 SteamCMD downloads
 
 `node tests/steamcmd-test.js` runs live with `steamcmdButtons` on. Workshop
 cards: one persistent button joins Steam's hover actions row before Quick View,
