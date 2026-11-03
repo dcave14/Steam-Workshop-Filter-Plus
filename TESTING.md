@@ -2,7 +2,7 @@
 
 How this project is tested.
 
-## Linked collections (unreleased)
+## 1.5.3 linked collections
 
 `tests/steamcmd-edge-test.js` (73 checks) adds fixtures in Steam's real markup
 (`.childrenTitle` then a `.collections` grid): nesting (L1 -> L3 -> L4), a loop
@@ -15,7 +15,7 @@ reading, and the classic layout (overhaul off). It fails with
 Progression Modpack: both linked parts read and one list without repeats
 (863 + 427 + 194 = 1,484 mods on 2026-11-03).
 
-## RimOxide hand-off (unreleased)
+## 1.5.3 RimOxide hand-off
 
 `tests/steamcmd-edge-test.js` (now 60 checks) adds: no marker keeps Copy/.bat;
 the marker set after load shows only **Download in RimOxide**; the opened link
