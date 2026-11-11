@@ -15,10 +15,12 @@ are excluded. It cannot proxy arbitrary URLs or perform subscription mutations.
 Controls:
 
 - 4 KiB request limit, 4 MiB upstream response limit and bounded timeout.
-- Exact normalized batches cached for 15 minutes in Cloudflare's regional cache.
+- Answers cached per item for 15 minutes in the Durable Object's SQLite storage;
+  a request asks Steam only for the IDs not already stored. Expired rows are
+  deleted on the next write.
 - 30 requests/minute per client IP per Cloudflare location; this limiter is
   approximate. Origin/CORS checks are not authentication.
-- A persistent SQLite Durable Object reserves each upstream cache miss against
+- The same persistent SQLite Durable Object reserves each upstream call against
   a shared 50,000-request budget. It uses conservative hourly buckets covering
   the preceding 24 hours plus the current bucket. It fails closed when exhausted.
   Calls made with this key outside this backend are not counted by this budget.
