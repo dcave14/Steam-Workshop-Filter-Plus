@@ -21,7 +21,7 @@ let suites=[
  ['steamcmd-edge-test.js'],['native-style-leak-test.js'],
  // Live Steam: page types, in-page navigation, SteamCMD on real markup. Steam
  // rate-limits anonymous sessions; a 429 failure means wait and rerun --only.
- ['page-sweep-test.js'],['steamcmd-test.js']
+ ['page-sweep-test.js'],['steamcmd-test.js'],['page-size-default-test.js'],['page-size-default-test.js','--firefox']
 ];
 const root=path.resolve(__dirname,'..'),out=path.join(__dirname,'out','release-1.5.0');fs.mkdirSync(out,{recursive:true});
 const only=process.argv.find(a=>a.startsWith('--only='))?.slice(7);

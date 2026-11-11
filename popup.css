@@ -29,4 +29,6 @@ footer{border-top:1px solid #3b4654;margin-top:14px;padding-top:10px;color:#aeb7
 .motion-options label{display:flex;align-items:center;gap:7px;cursor:pointer}
 .motion-options input{margin:0;accent-color:#1a9fff}
 .motion-options:disabled{opacity:.45}
+.pin-row>select{color-scheme:dark;background:#252d36;color:#e5e8eb;border:1px solid #536171;border-radius:2px;padding:4px 6px;font:13px Arial,sans-serif;cursor:pointer}
+.pin-row>select:focus-visible{outline:2px solid #b8e5ff;outline-offset:2px}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}

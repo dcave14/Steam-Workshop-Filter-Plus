@@ -34,7 +34,7 @@ async function launch(chrome, options = {}) {
     // Firefox BiDi cannot open moz-extension popups. Seed only presentation
     // preferences in this disposable test copy; no production test bridge.
     if (presentationPreferences) {
-        const allowed = {sidebarPosition:['left','right'],collectionOverhaul:[true,false], pinnedSidebar:[true,false], pinnedWorkshopBar:[true,false], pinnedCollections:[true,false], layoutDensity: ['comfortable', 'compact'], reduceMotion: [true, false], disableCardHover: [true, false], pauseHomepageCarousels: [true, false], freezeAnimatedPreviews: [true, false], steamcmdButtons: [true, false]};
+        const allowed = {sidebarPosition:['left','right'],collectionOverhaul:[true,false], pinnedSidebar:[true,false], pinnedWorkshopBar:[true,false], pinnedCollections:[true,false], layoutDensity: ['comfortable', 'compact'], reduceMotion: [true, false], disableCardHover: [true, false], pauseHomepageCarousels: [true, false], freezeAnimatedPreviews: [true, false], steamcmdButtons: [true, false], defaultPageSize: [10, 15, 30, 50, 75, 100]};
         for (const [key, value] of Object.entries(presentationPreferences)) {
             if (!allowed[key]?.includes(value)) throw Error('Invalid presentation test preference: '+key);
         }

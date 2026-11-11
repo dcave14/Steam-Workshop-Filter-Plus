@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- **Mods per page** default in the settings popup (10, 15, 30, 50, 75 or 100). It applies to page one of Workshop browse pages whose link names no size; a size chosen on the page keeps priority for that tab, and later pages and shared links keep their own size
+
 ## 1.5.3 (2026-11-03)
 - SteamCMD on collections includes **linked collections**, followed through their own links and loops (Ferny's Progression Modpack with its Content and Cosmetics parts: 1,484 mods in one list). Repeats are removed, title and creator saved filters apply, a hub with no mods of its own works, and unreadable or rate-limited collections are reported with Retry. Copy, .bat and RimOxide wait until every linked collection is read
 - SteamCMD inside RimOxide: when RimOxide's built-in browser marks the page, the popover shows **Download in RimOxide** instead of Copy command / Save .bat, and hands the same mods (required mods included when ticked, saved filters applied) to RimOxide's download preview. RimWorld only, up to 2,500 mods; normal browsers are unchanged

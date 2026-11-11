@@ -26,6 +26,12 @@ The page sidebar contains search and filters; appearance settings live in the po
 Collection controls keep their native styling; reset clears only Hide Subscribed,
 Ratings and Star Rating without changing saved filters or subscriptions.
 
+**Mods per page** sets a default for Workshop browse pages: Steam (30), 10, 15, 50, 75
+or 100. It applies to page one when the page's link doesn't already name a size, so
+shared links and later pages keep theirs. Choosing a size from the page's own dropdown
+takes priority for the rest of that tab. Changing the default updates an open page that
+got its size from the default.
+
 The popup's **Card layout** switch applies immediately to Workshop browse results.
 **Compact** fits up to six cards across when space allows and uses fewer columns on
 narrower screens. Each filter dropdown stays exactly one card wide after flipping

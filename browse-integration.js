@@ -3,7 +3,9 @@
 (function () {
     'use strict';
     if (!/\/workshop\/browse\/?$/.test(location.pathname)) return;
-    var root = document.documentElement, frame = null, restoredUrl = '', appliedPosition = '', select = null, nativeControl = null;
+    var root = document.documentElement, frame = null, restoredUrl = '', appliedPosition = '', select = null, nativeControl = null, defaultedUrl = '', defaultedSize = 0;
+    var CHOSEN_KEY = 'wshs-page-size-chosen';
+    function chosenInTab() { try { return sessionStorage.getItem(CHOSEN_KEY) === '1'; } catch (_) { return false; } }
     var sizes = [10, 15, 30, 50, 75, 100];
     // A reload retains Steam's client query in navigation state, while SSR
     // normalizes extended sizes to 30. Match that first render, then restore below.
@@ -67,6 +69,17 @@
             var page = Number(url.searchParams.get('p') || 1);
             state.browse.onBrowseHandler({ num_per_page: requestedSize, page: Number.isSafeInteger(page) && page > 0 && page <= 1000 ? page : 1 });
         }
+        // The default from the settings popup: page one only, when the URL
+        // names no size and nothing was chosen on the page in this tab. A size
+        // this page got from the default follows later changes to the setting.
+        var preferred = Number(root.getAttribute('data-wshs-default-page-size'));
+        var onPage = Number(url.searchParams.get('p') || 1);
+        var urlSize = url.searchParams.get('num_per_page');
+        if (sizes.indexOf(preferred) !== -1 && value !== preferred && (!urlSize || Number(urlSize) === defaultedSize) && onPage === 1 &&
+            !chosenInTab() && defaultedUrl !== url.href) {
+            defaultedUrl = url.href; defaultedSize = preferred;
+            state.browse.onBrowseHandler({ num_per_page: preferred, page: 1 });
+        }
         if (!state.control) {
             if (select) select.remove(); select = null;
             if (nativeControl) nativeControl.classList.remove('wshs-native-page-size'); nativeControl = null;
@@ -81,6 +94,7 @@
             select.addEventListener('change', function () {
                 var next = discover(), size = Number(select.value);
                 if (!next || sizes.indexOf(size) === -1) return;
+                try { sessionStorage.setItem(CHOSEN_KEY, '1'); } catch (_) {}
                 // A new size starts at page one, as Steam's native selector does.
                 next.browse.onBrowseHandler({ num_per_page: size, page: 1 });
             });
@@ -96,7 +110,7 @@
         event.preventDefault();
     });
     new MutationObserver(schedule).observe(document, { childList: true, subtree: true });
-    new MutationObserver(schedule).observe(root, { attributes: true, attributeFilter: ['data-wshs-page-hydrated', 'data-wshs-sidebar-position'] });
+    new MutationObserver(schedule).observe(root, { attributes: true, attributeFilter: ['data-wshs-page-hydrated', 'data-wshs-sidebar-position', 'data-wshs-default-page-size'] });
     window.addEventListener('popstate', schedule);
     window.addEventListener('resize', schedule);
     if (window.navigation) window.navigation.addEventListener('currententrychange', schedule);

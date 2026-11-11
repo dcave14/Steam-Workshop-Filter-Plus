@@ -2,6 +2,18 @@
 
 How this project is tested.
 
+## Default mods per page (unreleased)
+
+`tests/page-size-default-test.js` (live; Chrome 14 checks, `--firefox` 8): the
+setting starts at Steam (30); a default of 75 gives a fresh browse page 75 mods
+and a matching dropdown; `num_per_page` in the URL and `p=2` links keep their
+own size; choosing 30 on the page survives the default, a reload and another
+browse page in that tab; a new tab uses the default again; changing the default
+in the popup updates an open page whose size came from the default; Steam (30)
+removes the setting and Steam's own 30 returns. Chrome sets the default through
+the real popup because the launcher re-applies presets on every page load. The
+suite fails with the previous `browse-integration.js` and `workshop-sidebar.js`.
+
 ## 1.5.3 linked collections
 
 `tests/steamcmd-edge-test.js` (73 checks) adds fixtures in Steam's real markup

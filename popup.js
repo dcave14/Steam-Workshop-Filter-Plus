@@ -10,7 +10,8 @@
     var previews = document.getElementById('freeze-animated-previews');
     var overhaul = document.getElementById('collection-overhaul');
     var steamcmd = document.getElementById('steamcmd-buttons');
-    var keys = ['pinnedSidebar', 'pinnedWorkshopBar', 'pinnedCollections', 'sidebarPosition', 'layoutDensity', 'reduceMotion', 'disableCardHover', 'pauseHomepageCarousels', 'freezeAnimatedPreviews', 'collectionOverhaul', 'steamcmdButtons'];
+    var pageSize = document.getElementById('default-page-size');
+    var keys = ['pinnedSidebar', 'pinnedWorkshopBar', 'pinnedCollections', 'sidebarPosition', 'layoutDensity', 'reduceMotion', 'disableCardHover', 'pauseHomepageCarousels', 'freezeAnimatedPreviews', 'collectionOverhaul', 'steamcmdButtons', 'defaultPageSize'];
     var preferences = {};
     function render(data) {
         pin.checked = data.pinnedSidebar === true;
@@ -24,6 +25,7 @@
         previews.checked = data.freezeAnimatedPreviews !== false;
         overhaul.checked = data.collectionOverhaul !== false;
         steamcmd.checked = data.steamcmdButtons === true;
+        pageSize.value = [10, 15, 30, 50, 75, 100].indexOf(data.defaultPageSize) !== -1 ? String(data.defaultPageSize) : '';
         document.getElementById('motion-settings').disabled = !motion.checked;
     }
     async function save(update) {
@@ -31,7 +33,7 @@
         catch (_) { document.getElementById('status').textContent = 'Could not save preferences. Try again.'; }
     }
     chrome.storage.local.get(keys).then(function (data) {
-        preferences = data; render(data); pin.disabled = false; collectionPin.disabled = false; workshopPin.disabled = false; motion.disabled = false; overhaul.disabled = false; steamcmd.disabled = false;
+        preferences = data; render(data); pin.disabled = false; collectionPin.disabled = false; workshopPin.disabled = false; motion.disabled = false; overhaul.disabled = false; steamcmd.disabled = false; pageSize.disabled = false;
         document.getElementById('position-settings').disabled = false; document.getElementById('density-settings').disabled = false;
     });
     pin.addEventListener('change', function () { save({ pinnedSidebar: pin.checked }); });
@@ -45,6 +47,10 @@
     previews.addEventListener('change', function () { save({ freezeAnimatedPreviews: previews.checked }); });
     overhaul.addEventListener('change', function () { save({ collectionOverhaul: overhaul.checked }); });
     steamcmd.addEventListener('change', function () { save({ steamcmdButtons: steamcmd.checked }); });
+    pageSize.addEventListener('change', function () {
+        if (pageSize.value) { save({ defaultPageSize: Number(pageSize.value) }); return; }
+        chrome.storage.local.remove('defaultPageSize').catch(function () { document.getElementById('status').textContent = 'Could not save preferences. Try again.'; });
+    });
     chrome.storage.onChanged.addListener(function (changes, area) {
         if (area !== 'local') return;
         keys.forEach(function (key) { if (changes[key]) preferences[key] = changes[key].newValue; });

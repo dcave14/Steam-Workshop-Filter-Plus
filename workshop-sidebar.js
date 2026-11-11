@@ -64,6 +64,11 @@
         frame = null;
         var position = preferences.sidebarPosition === 'right' ? 'right' : 'left';
         if (root.getAttribute('data-wshs-sidebar-position') !== position) root.setAttribute('data-wshs-sidebar-position', position);
+        // browse-integration.js (Steam's page context) reads the default page size here.
+        var pageSize = [10, 15, 30, 50, 75, 100].indexOf(preferences.defaultPageSize) !== -1 ? String(preferences.defaultPageSize) : '';
+        if ((root.getAttribute('data-wshs-default-page-size') || '') !== pageSize) {
+            if (pageSize) root.setAttribute('data-wshs-default-page-size', pageSize); else root.removeAttribute('data-wshs-default-page-size');
+        }
         if (window.innerWidth < 1000) { clear(); discoveryDirty = true; return; }
         if (discoveryDirty || (anchors && !anchorsValid())) {
             discoveryDirty = false;
@@ -124,12 +129,13 @@
         if (node.matches(selector)) return true;
         return Array.prototype.some.call(node.querySelectorAll(selector), function (match) { return !match.closest(ignoredUi); });
     }
-    chrome.storage.local.get(['pinnedSidebar', 'sidebarPosition']).then(function (data) { preferences = data; schedule(); });
+    chrome.storage.local.get(['pinnedSidebar', 'sidebarPosition', 'defaultPageSize']).then(function (data) { preferences = data; schedule(); });
     chrome.storage.onChanged.addListener(function (changes, area) {
         if (area !== 'local') return;
         if (changes.pinnedSidebar) preferences.pinnedSidebar = changes.pinnedSidebar.newValue === true;
         if (changes.sidebarPosition) preferences.sidebarPosition = changes.sidebarPosition.newValue;
-        if (changes.pinnedSidebar || changes.sidebarPosition) schedule();
+        if (changes.defaultPageSize) preferences.defaultPageSize = changes.defaultPageSize.newValue;
+        if (changes.pinnedSidebar || changes.sidebarPosition || changes.defaultPageSize) schedule();
     });
     new MutationObserver(function (changes) {
         var relevant = '.wshs-saved-filters, form, input, svg[viewBox="0 0 32 18"], .aspectratio_16x9, .aspectratio_square';
