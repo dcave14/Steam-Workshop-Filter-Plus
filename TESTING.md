@@ -2,7 +2,7 @@
 
 How this project is tested.
 
-## Default mods per page (unreleased)
+## 1.5.4 default mods per page
 
 `tests/page-size-default-test.js` (live; Chrome 14 checks, `--firefox` 8): the
 setting starts at Steam (30); a default of 75 gives a fresh browse page 75 mods

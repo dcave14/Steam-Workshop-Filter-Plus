@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Steam Workshop Filter Plus",
-    "version": "1.5.3",
+    "version": "1.5.4",
     "description": "Hide subscribed Workshop items, filter ratings, and save keyword, author, and dependency filters per game.",
     "icons": {
         "16": "icons/icon-16.png",
