@@ -20,7 +20,7 @@ let checks=0;function check(name,value){assert.ok(value,name);checks++;console.l
   await p.$eval('#animated-preview',n=>{n.src+='?replacement';n.style.width='80px';});await wait(200);
   check(mode+': source changes and resize refresh the still without duplicates',await p.$eval('#animated-preview',n=>n.parentElement.querySelectorAll('canvas').length===1&&Math.abs(n.getBoundingClientRect().width-n.parentElement.querySelector('canvas').getBoundingClientRect().width)<1));
   if(!firefox){
-   if(!popup){const target=b.targets().find(t=>t.url().startsWith('chrome-extension://'));popup=await b.newPage();await popup.goto('chrome-extension://'+new URL(target.url()).hostname+'/popup.html');await popup.waitForFunction(()=>!document.querySelector('#reduce-motion').disabled);}
+   if(!popup){const target=b.targets().find(t=>t.url().startsWith('chrome-extension://'));popup=await b.newPage();await popup.goto('chrome-extension://'+new URL(target.url()).hostname+'/src/popup/popup.html');await popup.waitForFunction(()=>!document.querySelector('#reduce-motion').disabled);}
    await popup.bringToFront();await popup.click('#freeze-animated-previews');await p.bringToFront();await p.waitForFunction(()=>!document.querySelector('.wshs-still-preview'));
    const frames=[];for(let i=0;i<5;i++){frames.push(Buffer.from(await img.screenshot()));await wait(110);}
    check(mode+': turning GIF option off restores real animation',frames.some(x=>!x.equals(frames[0])));

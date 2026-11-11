@@ -16,7 +16,7 @@ let checks=0;function check(name,value){assert.ok(value,name);checks++;console.l
   check('dropdown offers 75 and 100 alongside native sizes',await page.$$eval('.wshs-page-size option',es=>es.map(e=>e.value).join(',')==='10,15,30,50,75,100'));
   if(!firefox){
    const target=browser.targets().find(t=>t.url().startsWith('chrome-extension://'));
-   const origin='chrome-extension://'+new URL(target.url()).hostname;const popup=await browser.newPage();await popup.goto(origin+'/popup.html');
+   const origin='chrome-extension://'+new URL(target.url()).hostname;const popup=await browser.newPage();await popup.goto(origin+'/src/popup/popup.html');
    await popup.waitForFunction(()=>!document.querySelector('#pinned-sidebar').disabled);
    check('popup contains independent sidebar, Workshop bar and collection pinning plus placement',await popup.$eval('body',b=>['pinned-sidebar','pinned-workshop-bar','pinned-collections','position-left','position-right'].every(id=>!!b.querySelector('#'+id))&&b.textContent.includes('Sidebar position')));
    await popup.screenshot({path:path.join(__dirname,'out','sidebar-popup.png'),clip:{x:0,y:0,width:330,height:280}});

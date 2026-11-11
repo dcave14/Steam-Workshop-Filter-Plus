@@ -276,30 +276,52 @@ sample per page, sequentially. The regression suite is `node tests/release-regre
 Measured changes and resource limits are in [perf/REPORT.md](../perf/REPORT.md).
 
 ### Project Structure
+Extension source lives in `src/`, grouped by what it does. `manifest.json` stays at the
+repository root, so Chrome can still load the repository folder directly, and it lists
+every script in load order.
 ```
-├── manifest.json            Extension manifest
-├── steam-dom.js             Finds cards, ratings and subscribed state on Steam's current layout
-├── content.js               Injects the controls, applies the filters, sizes the buttons
-├── workshop-metadata.js     Shared cached file sizes and user-rating counts from Steam
-├── collection-sizes.js      Total and filtered collection sizes
-├── collection-descriptions.js  Full mod descriptions for collection keyword search
-├── collection-row-align.js  Two rows of three collection controls
-├── collection-subscriptions.js  Filtered subscription confirmation and eligible-mod requests
-├── sort-popover-fit.js      Fits Steam's sort menu to the width of the sort button
-├── hydration-signal.js      Tells content.js when Steam's page has finished loading (React)
-├── saved-filters.js         Per-game keyword and author filters and card pickers
-├── title-word-inflection.js  Normalizes clicked English plurals, preserving exceptions
-├── pluralize.js             Bundled pluralize 8.0.0 (MIT; license included in source)
-├── search-terms-hook.js     Applies saved keywords to Steam's search requests
-├── saved-filters.css        Saved-filter sidebar and picker styles
-├── steamcmd.js / .css       Optional SteamCMD download commands for mods and collections
-├── linked-collections.js    Mods in a collection's linked collections, for SteamCMD
-├── styles.css               Styles for the controls and dropdowns
-├── icons/                   Extension icons (16, 32, 48, 128) and the full-size source artwork
-├── build.js                 Builds the Chrome and Firefox packages into dist/
-├── docs/                    Privacy policy page (GitHub Pages) and README GIFs
-├── perf/                    Performance test (Puppeteer)
-└── promo/                   Scripts for the promo video, store images and README GIFs
+├── manifest.json                  Extension manifest (file paths and load order)
+├── build.js                       Builds the Chrome and Firefox packages into dist/
+├── src/
+│   ├── core/                      Shared by every page
+│   │   ├── steam-dom.js           Finds cards, ratings and subscribed state on Steam's current layout
+│   │   ├── content.js             Injects the controls, applies the filters, sizes the buttons
+│   │   ├── styles.css             Styles for the controls and dropdowns
+│   │   ├── api-client.js          Requests to the shared Workshop data service
+│   │   ├── workshop-metadata.js   Shared cached file sizes and user-rating counts from Steam
+│   │   ├── workshop-dependencies.js  Required mods of each item
+│   │   ├── filter-matching.js     Keyword and author filter matching
+│   │   ├── title-word-inflection.js  Normalizes clicked English plurals, preserving exceptions
+│   │   └── pluralize.js           Bundled pluralize 8.0.0 (MIT; license included in source)
+│   ├── workshop/                  Workshop browse page features
+│   │   ├── saved-filters.js/.css  Per-game keyword and author filters and card pickers
+│   │   ├── workshop-sidebar.js/.css  Sidebar position, pinning and the mods-per-page default
+│   │   ├── workshop-appearance.js/.css  Layout density and motion settings
+│   │   ├── preview-motion.js      Freezes animated previews
+│   │   ├── workshop-result-count.js  Result count beside the toolbar
+│   │   ├── filter-bar-pinning.js  Keeps the filter bar in view while scrolling
+│   │   └── sort-popover-fit.js    Fits Steam's sort menu to the width of the sort button
+│   ├── collections/               Collection pages
+│   │   ├── collection-layout.js/.css  Workshop-style collection layout
+│   │   ├── collection-sizes.js    Total and filtered collection sizes
+│   │   ├── collection-descriptions.js  Full mod descriptions for collection keyword search
+│   │   ├── collection-row-align.js  Two rows of three collection controls
+│   │   └── linked-collections.js  Mods in a collection's linked collections, for SteamCMD
+│   ├── steamcmd/                  Optional SteamCMD download commands for mods and collections
+│   ├── page/                      Scripts that run in Steam's own page context
+│   │   ├── hydration-signal.js    Tells content.js when Steam's page has finished loading (React)
+│   │   ├── search-terms-hook.js   Applies saved keywords to Steam's search requests
+│   │   ├── browse-integration.js  Page size and position controls on Steam's browse page
+│   │   └── collection-subscriptions.js  Filtered subscription confirmation and eligible-mod requests
+│   ├── background/                Service worker, data service settings and Steam API requests
+│   ├── popup/                     Toolbar settings popup
+│   └── options/                   Optional Steam Web API key page
+├── backend/                       The shared Workshop data service (Cloudflare Worker)
+├── icons/                         Extension icons (16, 32, 48, 128) and the full-size source artwork
+├── docs/                          Guide, privacy policy (GitHub Pages) and README GIFs
+├── tests/                         Regression suites (node tests/release-regression.js)
+├── perf/                          Performance test (Puppeteer)
+└── promo/                         Scripts for the promo video, store images and README GIFs
 ```
 
 English inflection uses [pluralize 8.0.0](https://github.com/plurals/pluralize/tree/v8.0.0).

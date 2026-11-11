@@ -5,7 +5,7 @@ const {fixture}=require('./filter-fixtures');
 (async()=>{const browser=await launch();try{
  const page=await browser.newPage();await page.setViewport({width:1280,height:900});
  await page.setContent(fixture(false).replace('</style>','#CommunityTemplate{display:block}.fixture-grid{display:flex;flex-wrap:wrap;width:1000px;gap:20px}.fixture-card{box-sizing:border-box;width:235px;flex:none}.hidden-item,.wshs-filtered,.wshs-ratings-filtered,.wshs-review-omit{display:none!important}body{min-height:2500px}</style>'));
- await page.addScriptTag({content:fs.readFileSync(path.join(__dirname,'..','steam-dom.js'),'utf8')});
+ await page.addScriptTag({content:fs.readFileSync(path.join(__dirname,'..','src/core/steam-dom.js'),'utf8')});
  const checks=await page.evaluate(()=>{
   const results=[],ok=(name,value)=>{assert(value,name);results.push(name)},assert=(v,n)=>{if(!v)throw Error(n)};
   const grid=document.querySelector('.fixture-grid'),sample=grid.firstElementChild.cloneNode(true);

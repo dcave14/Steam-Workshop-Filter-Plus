@@ -7,7 +7,7 @@ let checks=0;function check(name,value){assert.ok(value,name);checks++;console.l
  const collection=await b.newPage();await collection.setViewport({width:1280,height:1000});
  await collection.goto('https://steamcommunity.com/sharedfiles/filedetails/?id=3818340638',{waitUntil:'load'});await collection.waitForSelector('.wshs-collection-filter-heading .wshs-toolbar-reset');
  const cw=await extensionWorld(collection),ww=await extensionWorld(workshop);
- const popup=await b.newPage();const url=await ww("chrome.runtime.getURL('popup.html')");await popup.goto(url);await popup.waitForFunction(()=>!document.querySelector('#pinned-collections').disabled);
+ const popup=await b.newPage();const url=await ww("chrome.runtime.getURL('src/popup/popup.html')");await popup.goto(url);await popup.waitForFunction(()=>!document.querySelector('#pinned-collections').disabled);
  check('all three independent pin options default off',await popup.$$eval('#pinned-sidebar,#pinned-workshop-bar,#pinned-collections',ns=>ns.length===3&&ns.every(n=>!n.checked)));
  check('collection reset sits outside the clean three-column filter row',await collection.$eval('.wshs-collection-controls',n=>!n.querySelector('.wshs-toolbar-reset')&&n.children.length===3)&&!!await collection.$('.wshs-collection-filter-heading .wshs-toolbar-reset'));
  await popup.click('#pinned-collections');await collection.bringToFront();

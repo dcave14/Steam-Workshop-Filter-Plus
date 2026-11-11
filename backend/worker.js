@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import '../api-data.js';
+import '../src/background/api-data.js';
 
 const ITEM_TTL_MS = 15 * 60 * 1000;
 // One coordination object per upstream credential. It holds the request budget

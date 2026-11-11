@@ -388,7 +388,7 @@ async function recordSettings(page, webm, browser) {
     const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank', newWindow: true });
     const popup = await (await browser.waitForTarget(t => t._targetId === targetId)).page();
     await popup.setViewport({ width: 330, height: 600, deviceScaleFactor: 1.4 });
-    await popup.goto('chrome-extension://' + new URL(worker.url()).host + '/popup.html', { waitUntil: 'load' });
+    await popup.goto('chrome-extension://' + new URL(worker.url()).host + '/src/popup/popup.html', { waitUntil: 'load' });
     await popup.waitForFunction(() => !document.getElementById('density-settings').disabled, { timeout: 10000 });
     const height = await popup.evaluate(() => Math.ceil(document.body.getBoundingClientRect().height));
     await popup.setViewport({ width: 330, height, deviceScaleFactor: 1.4 });

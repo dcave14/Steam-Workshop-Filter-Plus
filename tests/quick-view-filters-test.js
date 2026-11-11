@@ -9,10 +9,8 @@ async function firefox(extension){
 function firefoxExtension(){
  const root=path.resolve(__dirname,'..'),manifest=JSON.parse(fs.readFileSync(path.join(root,'dist/firefox/manifest.json')));
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'wshs-qv-firefox-'));
- const files=new Set([...Object.values(manifest.icons)]);
- ['steam-api.js','options.html','options.css','options.js','api-config.js','api-data.js'].forEach(f=>files.add(f));
- for(const s of manifest.content_scripts)for(const f of [...(s.js||[]),...(s.css||[])])files.add(f);
- for(const f of files)fs.copyFileSync(path.join(root,f),path.join(dir,f));
+ const files=require('../build').manifestFiles(manifest).filter(f=>f!=='manifest.json');
+ for(const f of files){fs.mkdirSync(path.dirname(path.join(dir,f)),{recursive:true});fs.copyFileSync(path.join(root,f),path.join(dir,f));}
  fs.writeFileSync(path.join(dir,'manifest.json'),JSON.stringify(manifest));return dir;
 }
 let checks=0;

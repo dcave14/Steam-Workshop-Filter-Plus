@@ -1,5 +1,5 @@
 const assert=require('assert/strict'),fs=require('fs'),vm=require('vm');
-const source=fs.readFileSync(require('path').join(__dirname,'../search-terms-hook.js'),'utf8');
+const source=fs.readFileSync(require('path').join(__dirname,'../src/page/search-terms-hook.js'),'utf8');
 const attrs=new Map([['data-wshs-terms','"saved phrase"'],['data-wshs-description-search','0']]),calls=[];
 const window={location:{href:'https://steamcommunity.com/workshop/browse/?appid=108600',origin:'https://steamcommunity.com'},fetch:(input,init)=>{calls.push({input,init});return Promise.resolve({ok:true});}};
 const document={documentElement:{getAttribute:n=>attrs.get(n)||null,setAttribute:(n,v)=>attrs.set(n,v)}};

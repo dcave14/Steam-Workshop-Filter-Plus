@@ -36,7 +36,7 @@ const author='.collectionItem .workshopItemAuthorName a';
   const rect=Element.prototype.getBoundingClientRect,style=getComputedStyle,animations=Element.prototype.getAnimations,set=CSSStyleDeclaration.prototype.setProperty;
   Element.prototype.getBoundingClientRect=function(){if(this===p)pickerWork.box++;if(this===a.closest('.collectionItem'))pickerWork.row++;return rect.call(this)};
   globalThis.getComputedStyle=function(el,...args){if(el===a)pickerWork.font++;return style.call(this,el,...args)};
-  Element.prototype.getAnimations=function(...args){if(new Error().stack.includes('saved-filters.js'))pickerWork.animations++;return animations.apply(this,args)};
+  Element.prototype.getAnimations=function(...args){if(new Error().stack.includes('src/workshop/saved-filters.js'))pickerWork.animations++;return animations.apply(this,args)};
   CSSStyleDeclaration.prototype.setProperty=function(...args){if(this===p.style||this===a.parentElement.style)pickerWork.writes++;return set.apply(this,args)};
  })()`);await wait(120);await world('Object.keys(pickerWork).forEach(k=>pickerWork[k]=0)');await wait(150);
  check('resting picker performs no geometry or animation discovery',await world('Object.values(pickerWork).every(n=>n===0)'));

@@ -1,5 +1,5 @@
 const assert=require('assert/strict');
-const {normalize}=require('../title-word-inflection');
+const {normalize}=require('../src/core/title-word-inflection');
 const pairs={
  workbenches:'workbench',benches:'bench',weapons:'weapon',bodies:'body',wolves:'wolf',knives:'knife',
  mice:'mouse',children:'child',people:'person',teeth:'tooth',feet:'foot',women:'woman',men:'man',

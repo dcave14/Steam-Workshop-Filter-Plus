@@ -39,7 +39,7 @@ const {fixture}=require('./filter-fixtures');
    console.log('Firefox: both layouts verified above. Options-page automation is restricted by Firefox BiDi.');
    return;
   }
-  const opening=b.waitForTarget(t=>t.url().endsWith('/options.html'));
+  const opening=b.waitForTarget(t=>t.url().endsWith('/src/options/options.html'));
   await settingsAnchor.click('.wshs-api-settings');const options=await(await opening).page();
   await options.waitForSelector('#service-settings:not([hidden])');
   assert.ok(await options.$eval('#personal-settings',e=>e.hidden));

@@ -16,8 +16,10 @@ function extensionCopy(){
  const files=new Set(['manifest.json',...Object.values(m.icons)]);
  for(const s of m.content_scripts)for(const f of [...(s.js||[]),...(s.css||[])])files.add(f);
  for(const f of files){
-  const snapshot=path.join(root,'tests/out/performance/source-before',f);
-  fs.copyFileSync(sourceBefore&&fs.existsSync(snapshot)?snapshot:path.join(root,f),path.join(dir,f));
+  fs.mkdirSync(path.dirname(path.join(dir,f)),{recursive:true});
+  // Snapshots from before src/ existed hold files flat by name.
+  const snapshot=[f,path.basename(f)].map(n=>path.join(root,'tests/out/performance/source-before',n)).find(n=>fs.existsSync(n));
+  fs.copyFileSync(sourceBefore&&snapshot?snapshot:path.join(root,f),path.join(dir,f));
  }return dir;
 }
 function delta(a,b){return{taskMs: +(1000*(b.TaskDuration-a.TaskDuration)).toFixed(2),scriptMs:+(1000*(b.ScriptDuration-a.ScriptDuration)).toFixed(2),layoutMs:+(1000*(b.LayoutDuration-a.LayoutDuration)).toFixed(2),styleMs:+(1000*(b.RecalcStyleDuration-a.RecalcStyleDuration)).toFixed(2),layouts:b.LayoutCount-a.LayoutCount,styleRecalcs:b.RecalcStyleCount-a.RecalcStyleCount,heapMB:+(b.JSHeapUsedSize/1048576).toFixed(1)}}

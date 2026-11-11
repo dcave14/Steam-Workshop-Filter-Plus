@@ -12,7 +12,7 @@ function collectionFixture(){return fixture(true).replace('<body>','<body><div c
  else{
   await p.waitForSelector('.wshs-design-collection');check('overhaul defaults on for existing and new installs',true);
   await addSavedFilter(p,'keyword','AI');await p.waitForFunction(()=>document.querySelectorAll('.collectionItem.wshs-filtered').length===3);
-  const target=b.targets().find(t=>t.url().startsWith('chrome-extension://')),popup=await b.newPage();await popup.goto('chrome-extension://'+new URL(target.url()).hostname+'/popup.html');await popup.waitForFunction(()=>!document.querySelector('#collection-overhaul').disabled);
+  const target=b.targets().find(t=>t.url().startsWith('chrome-extension://')),popup=await b.newPage();await popup.goto('chrome-extension://'+new URL(target.url()).hostname+'/src/popup/popup.html');await popup.waitForFunction(()=>!document.querySelector('#collection-overhaul').disabled);
   check('settings toggle defaults checked',await popup.$eval('#collection-overhaul',n=>n.checked));
   const other=[];
   for(const suffix of ['','&section=collections']){const page=await b.newPage();let loads=0;await page.setRequestInterception(true);page.on('request',r=>{if(r.isNavigationRequest()){loads++;return r.respond({status:200,contentType:'text/html',body:fixture(false)})}return r.abort()});await page.goto('https://steamcommunity.com/workshop/browse/?appid=294100'+suffix);await page.waitForSelector('.wshs-sf-input');other.push({page,loads:()=>loads});}

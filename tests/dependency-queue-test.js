@@ -8,7 +8,7 @@ const assert = require('assert/strict'), vm = require('vm'), fs = require('fs'),
         chrome:{storage:{local:{get:async()=>storage,set:async values=>Object.assign(storage,values),remove:async()=>{}}}},
         fetch:async()=>{calls++;return {ok:false,status:429,text:async()=>"You've made too many requests recently."};}
     };
-    vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../workshop-dependencies.js'),'utf8'),context);
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/core/workshop-dependencies.js'),'utf8'),context);
     const ids=Array.from({length:20},(_,i)=>String(i+1));
     window.WSHSDependencies.request(ids);
     await new Promise(resolve=>setImmediate(resolve));

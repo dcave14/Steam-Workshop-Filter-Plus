@@ -31,6 +31,10 @@ const GECKO = {
     data_collection_permissions: { required: ['websiteContent'] }
 };
 
+const BACKGROUND_LIBRARIES = ['src/background/api-config.js', 'src/background/api-data.js'];
+
+// The single list of files the extension loads; the tests and perf scripts
+// require it too.
 function manifestFiles(manifest) {
     const files = new Set(['manifest.json']);
     for (const script of manifest.content_scripts || []) {
@@ -40,8 +44,16 @@ function manifestFiles(manifest) {
     for (const f of Object.values(manifest.icons || {})) files.add(f);
     if (manifest.background && manifest.background.service_worker) files.add(manifest.background.service_worker);
     for (const f of manifest.background && manifest.background.scripts || []) files.add(f);
-    if (manifest.options_ui) ['options.html', 'options.css', 'options.js', 'api-config.js', 'api-data.js'].forEach(f => files.add(f));
-    if (manifest.action && manifest.action.default_popup) ['popup.html', 'popup.css', 'popup.js'].forEach(f => files.add(f));
+    // The background service worker loads these with importScripts(), and
+    // Firefox lists them as background scripts.
+    if (manifest.background) BACKGROUND_LIBRARIES.forEach(f => files.add(f));
+    // Pages ship with the stylesheet and script of the same name beside them.
+    const pages = [manifest.options_ui && manifest.options_ui.page, manifest.action && manifest.action.default_popup];
+    for (const page of pages.filter(Boolean)) {
+        files.add(page);
+        files.add(page.replace(/\.html$/, '.css'));
+        files.add(page.replace(/\.html$/, '.js'));
+    }
     return [...files];
 }
 
@@ -111,13 +123,20 @@ function build(target, manifest) {
     console.log(target + ': ' + entries.length + ' files -> ' + path.relative(ROOT, zip));
 }
 
+function firefoxManifest(source) {
+    const firefox = JSON.parse(JSON.stringify(source));
+    firefox.background = { scripts: [...BACKGROUND_LIBRARIES, source.background.service_worker] };
+    firefox.browser_specific_settings = { gecko: GECKO, gecko_android: { strict_min_version: '142.0' } };
+    return firefox;
+}
+
+module.exports = { manifestFiles, firefoxManifest };
+if (require.main !== module) return;
+
 const source = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
 for (const file of manifestFiles(source)) {
     if (!fs.existsSync(path.join(ROOT, file))) throw new Error('manifest.json references a missing file: ' + file);
 }
 
 build('chrome', source);
-const firefox = JSON.parse(JSON.stringify(source));
-firefox.background = { scripts: ['api-config.js', 'api-data.js', source.background.service_worker] };
-firefox.browser_specific_settings = { gecko: GECKO, gecko_android: { strict_min_version: '142.0' } };
-build('firefox', firefox);
+build('firefox', firefoxManifest(source));

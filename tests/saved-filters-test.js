@@ -40,16 +40,10 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 
 function copyExtension() {
     // Chrome's Extensions.loadUnpacked rejects paths containing spaces.
-    const manifest = JSON.parse(fs.readFileSync(path.join(EXT_SRC, 'manifest.json'), 'utf8'));
-    if (FIREFOX) {
-        manifest.browser_specific_settings = JSON.parse(fs.readFileSync(path.join(EXT_SRC, 'dist/firefox/manifest.json'), 'utf8')).browser_specific_settings;
-        manifest.background = { scripts: ['api-config.js', 'api-data.js', 'steam-api.js'] };
-    }
-    const files = new Set(['manifest.json', ...Object.values(manifest.icons || {})]);
-    ['steam-api.js','options.html','options.css','options.js','api-config.js','api-data.js'].forEach(f=>files.add(f));
-    for (const script of manifest.content_scripts) {
-        for (const f of [...(script.js || []), ...(script.css || [])]) files.add(f);
-    }
+    const { manifestFiles, firefoxManifest } = require('../build');
+    let manifest = JSON.parse(fs.readFileSync(path.join(EXT_SRC, 'manifest.json'), 'utf8'));
+    if (FIREFOX) manifest = firefoxManifest(manifest);
+    const files = manifestFiles(manifest).filter(f => f !== 'manifest.json');
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wshs-sf-'));
     for (const f of files) {
         fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true });

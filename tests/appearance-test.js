@@ -8,7 +8,7 @@ const geometry=`(()=>{const cards=WSHSDom.enumerateCards(),g=WSHSDom.getCardGeom
  const errors=[];const page=await b.newPage();page.on('pageerror',e=>errors.push(e.message));await page.setViewport({width:1780,height:1050});
  await page.goto('https://steamcommunity.com/workshop/browse/?appid=108600&browsesort=trend',{waitUntil:'load',timeout:45000});await page.waitForSelector('.wshs-page-size');
  const world=await extensionWorld(page),before=await world(geometry);
- const target=b.targets().find(t=>t.url().startsWith('chrome-extension://'));const popup=await b.newPage();await popup.goto('chrome-extension://'+new URL(target.url()).hostname+'/popup.html');
+ const target=b.targets().find(t=>t.url().startsWith('chrome-extension://'));const popup=await b.newPage();await popup.goto('chrome-extension://'+new URL(target.url()).hostname+'/src/popup/popup.html');
  await popup.waitForFunction(()=>!document.querySelector('#reduce-motion').disabled);
  check('new settings default to comfortable and motion off',await popup.$eval('#density-comfortable',e=>e.checked)&&await popup.$eval('#reduce-motion',e=>!e.checked)&&await popup.$eval('#motion-settings',e=>e.disabled));
  async function click(selector){await popup.bringToFront();await popup.click(selector);await page.bringToFront();}

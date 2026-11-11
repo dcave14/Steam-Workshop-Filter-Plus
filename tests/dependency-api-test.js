@@ -8,7 +8,7 @@ const assert=require('assert/strict'),fs=require('fs'),vm=require('vm'),path=req
     batches.push(message.ids);
     return complete?{ok:true,rows:message.ids.map(id=>({id,title:'Fixture',ids:id==='1'?['3809306528']:[],updated:Date.now()}))}:{ok:false,message:'Steam rejected the API key.'};
    }}},fetch:async()=>{fetches++;return {ok:false,status:503,text:async()=>''};}};
- vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../workshop-dependencies.js'),'utf8'),context);
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/core/workshop-dependencies.js'),'utf8'),context);
  const settle=()=>new Promise(resolve=>setImmediate(resolve));
  window.WSHSDependencies.request(Array.from({length:205},(_,i)=>String(i+1)));await settle();
  assert.equal(batches.length,3);assert.ok(batches.every(b=>b.length<=100));

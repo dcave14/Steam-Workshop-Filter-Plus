@@ -31,9 +31,9 @@ const BROWSE_URL = 'https://steamcommunity.com/workshop/browse/?appid=294100&bro
 // RimWorld collection with ~860 items: the large-list stress case.
 const COLLECTION_URL = 'https://steamcommunity.com/sharedfiles/filedetails/?id=3808371772';
 
-const EXT_FILES = ['manifest.json', 'steam-dom.js', 'content.js', 'collection-row-align.js',
-    'hydration-signal.js', 'sort-popover-fit.js', 'styles.css', 'icons/icon-16.png', 'icons/icon-32.png', 'icons/icon-48.png', 'icons/icon-128.png',
-    'saved-filters.js', 'saved-filters.css', 'search-terms-hook.js'];
+const EXT_FILES = ['manifest.json', 'src/core/steam-dom.js', 'src/core/content.js', 'src/collections/collection-row-align.js',
+    'src/page/hydration-signal.js', 'src/workshop/sort-popover-fit.js', 'src/core/styles.css', 'icons/icon-16.png', 'icons/icon-32.png', 'icons/icon-48.png', 'icons/icon-128.png',
+    'src/workshop/saved-filters.js', 'src/workshop/saved-filters.css', 'src/page/search-terms-hook.js'];
 
 function copyExtension(variant) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wshs-perf-'));
@@ -47,7 +47,7 @@ function copyExtension(variant) {
         const manifestPath = path.join(dir, 'manifest.json');
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
         manifest.content_scripts = manifest.content_scripts.filter(
-            entry => !entry.js.includes('hydration-signal.js'));
+            entry => !entry.js.includes('src/page/hydration-signal.js'));
         fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 4));
     }
     return dir.split(path.sep).join('/');

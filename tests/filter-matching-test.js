@@ -1,7 +1,7 @@
 const assert = require('assert/strict');
 const vm = require('vm'), fs = require('fs'), path = require('path');
-const context = {window:{WSHSWordForms:require('../title-word-inflection')}};
-vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../filter-matching.js'),'utf8'),context);
+const context = {window:{WSHSWordForms:require('../src/core/title-word-inflection')}};
+vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/core/filter-matching.js'),'utf8'),context);
 const {contains,local} = context.window.WSHSMatching;
 const cases = [
     ['AI','AI',true], ['ai survivors','AI',true], ['[AI] textures','AI',true],

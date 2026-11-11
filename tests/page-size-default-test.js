@@ -17,7 +17,7 @@ async function settle(p,n){await p.waitForFunction(n=>new Set([...document.query
   let popup=null;
   if(!firefox){
    const t=await b.waitForTarget(t=>t.url().startsWith('chrome-extension://'),{timeout:15000});popup=await b.newPage();
-   await popup.goto('chrome-extension://'+new URL(t.url()).hostname+'/popup.html');await popup.waitForFunction(()=>!document.querySelector('#default-page-size').disabled);
+   await popup.goto('chrome-extension://'+new URL(t.url()).hostname+'/src/popup/popup.html');await popup.waitForFunction(()=>!document.querySelector('#default-page-size').disabled);
    check('Settings start at Steam (30)',await popup.$eval('#default-page-size',s=>s.value===''));
    await popup.select('#default-page-size','75');
   }

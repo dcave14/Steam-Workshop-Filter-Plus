@@ -88,7 +88,7 @@ try{
  await p.keyboard.press('Escape');
  // Settings toggle
  const target=b.targets().find(t=>t.url().startsWith('chrome-extension://'));const popup=await b.newPage();
- await popup.goto('chrome-extension://'+new URL(target.url()).hostname+'/popup.html');await popup.waitForFunction(()=>!document.querySelector('#steamcmd-buttons').disabled);
+ await popup.goto('chrome-extension://'+new URL(target.url()).hostname+'/src/popup/popup.html');await popup.waitForFunction(()=>!document.querySelector('#steamcmd-buttons').disabled);
  check('Settings: toggle shows the stored choice',await popup.$eval('#steamcmd-buttons',n=>n.checked));
  await popup.click('#steamcmd-buttons');await p.bringToFront();await p.waitForFunction(()=>!document.querySelector('.wshs-steamcmd-collection')&&document.querySelector('.wshs-steamcmd-pop').hidden);
  check('Settings: turning off removes buttons and closes the popover',true);

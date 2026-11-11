@@ -4,8 +4,8 @@ let checks=0;function check(name,value){assert.ok(value,name);checks++;console.l
 (async()=>{
  const browser=await launch('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe');
  try{
-  const target=await browser.waitForTarget(t=>t.type()==='service_worker'&&t.url().endsWith('/steam-api.js'));
-  const worker=await target.worker();const base=target.url().replace(/\/steam-api\.js$/, '');
+  const target=await browser.waitForTarget(t=>t.type()==='service_worker'&&t.url().endsWith('/src/background/steam-api.js'));
+  const worker=await target.worker();const base='chrome-extension://'+new URL(target.url()).host;
   await worker.evaluate(()=>{
    globalThis.__calls=[];
    chrome.permissions.contains=async()=>true;
@@ -14,7 +14,7 @@ let checks=0;function check(name,value){assert.ok(value,name);checks++;console.l
     return {ok:true,status:200,json:async()=>({response:{publishedfiledetails:[{publishedfileid:'3812510377',result:1,title:'API fixture',num_children:1,children:[{publishedfileid:'3809306528'}]}]}})};
    };
   });
-  const page=await browser.newPage();await page.goto(base+'/options.html');
+  const page=await browser.newPage();await page.goto(base+'/src/options/options.html');
   await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('No key'));
   check('options start with a blank password field',await page.$eval('#api-key',e=>e.type==='password'&&e.value===''));
   await page.evaluate(()=>{chrome.permissions.request=async()=>false;});

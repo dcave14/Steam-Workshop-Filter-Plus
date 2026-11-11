@@ -10,11 +10,11 @@
         "128": "icons/icon-128.png"
     },
     "permissions": ["storage"],
-    "action": { "default_popup": "popup.html", "default_title": "Steam Workshop Filter Plus", "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png" } },
+    "action": { "default_popup": "src/popup/popup.html", "default_title": "Steam Workshop Filter Plus", "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png" } },
     "optional_host_permissions": ["https://api.steampowered.com/*"],
     "host_permissions": ["https://steam-workshop-data.prodbycave.workers.dev/*"],
-    "background": { "service_worker": "steam-api.js" },
-    "options_ui": { "page": "options.html", "open_in_tab": true },
+    "background": { "service_worker": "src/background/steam-api.js" },
+    "options_ui": { "page": "src/options/options.html", "open_in_tab": true },
     "content_scripts": [
         {
             "matches": [
@@ -22,8 +22,8 @@
                 "*://*.steamcommunity.com/sharedfiles/filedetails/*",
                 "*://*.steamcommunity.com/app/*/workshop/*"
             ],
-            "js": ["api-client.js", "workshop-metadata.js", "collection-descriptions.js", "workshop-dependencies.js", "filter-matching.js", "steam-dom.js", "content.js", "collection-row-align.js", "sort-popover-fit.js", "pluralize.js", "title-word-inflection.js", "saved-filters.js", "collection-sizes.js", "workshop-sidebar.js", "filter-bar-pinning.js", "workshop-appearance.js", "preview-motion.js", "workshop-result-count.js", "collection-layout.js", "linked-collections.js", "steamcmd.js"],
-            "css": ["styles.css", "saved-filters.css", "workshop-sidebar.css", "workshop-appearance.css", "collection-layout.css", "steamcmd.css"],
+            "js": ["src/core/api-client.js", "src/core/workshop-metadata.js", "src/collections/collection-descriptions.js", "src/core/workshop-dependencies.js", "src/core/filter-matching.js", "src/core/steam-dom.js", "src/core/content.js", "src/collections/collection-row-align.js", "src/workshop/sort-popover-fit.js", "src/core/pluralize.js", "src/core/title-word-inflection.js", "src/workshop/saved-filters.js", "src/collections/collection-sizes.js", "src/workshop/workshop-sidebar.js", "src/workshop/filter-bar-pinning.js", "src/workshop/workshop-appearance.js", "src/workshop/preview-motion.js", "src/workshop/workshop-result-count.js", "src/collections/collection-layout.js", "src/collections/linked-collections.js", "src/steamcmd/steamcmd.js"],
+            "css": ["src/core/styles.css", "src/workshop/saved-filters.css", "src/workshop/workshop-sidebar.css", "src/workshop/workshop-appearance.css", "src/collections/collection-layout.css", "src/steamcmd/steamcmd.css"],
             "run_at": "document_start"
         },
         {
@@ -31,13 +31,13 @@
                 "*://*.steamcommunity.com/workshop/*",
                 "*://*.steamcommunity.com/app/*/workshop/*"
             ],
-            "js": ["hydration-signal.js", "search-terms-hook.js", "browse-integration.js"],
+            "js": ["src/page/hydration-signal.js", "src/page/search-terms-hook.js", "src/page/browse-integration.js"],
             "run_at": "document_start",
             "world": "MAIN"
         },
         {
             "matches": ["*://*.steamcommunity.com/sharedfiles/filedetails/*"],
-            "js": ["collection-subscriptions.js"],
+            "js": ["src/page/collection-subscriptions.js"],
             "run_at": "document_start",
             "world": "MAIN"
         }

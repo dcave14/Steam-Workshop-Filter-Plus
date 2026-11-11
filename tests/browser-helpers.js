@@ -3,7 +3,40 @@ const os = require('os');
 const path = require('path');
 const puppeteer = require('../perf/node_modules/puppeteer-core');
 
+const { manifestFiles } = require('../build');
+
 const ROOT = path.resolve(__dirname, '..');
+const API_CONFIG = 'src/background/api-config.js';
+
+// Repository path of a source file named by its file name (for example
+// 'steam-dom.js' -> 'src/core/steam-dom.js'), so tests do not hard-code folders.
+let sourceIndex = null;
+function sourcePath(name) {
+    if (!sourceIndex) {
+        sourceIndex = new Map();
+        const walk = dir => {
+            for (const entry of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
+                const rel = dir + '/' + entry.name;
+                if (entry.isDirectory()) walk(rel);
+                else sourceIndex.set(entry.name, rel);
+            }
+        };
+        walk('src');
+    }
+    if (!sourceIndex.has(name)) throw Error('No source file named ' + name);
+    return path.join(ROOT, sourceIndex.get(name));
+}
+
+// WSHS_SOURCE_OVERLAY folders hold older source files, either at their
+// repository path or flat by file name (snapshots taken before src/ existed).
+function overlaySource(overlay, file) {
+    if (!overlay) return null;
+    for (const candidate of [path.join(overlay, file), path.join(overlay, path.basename(file))]) {
+        if (fs.existsSync(candidate)) return candidate;
+    }
+    return null;
+}
+
 const BASE_URL = 'https://steamcommunity.com/workshop/browse/?appid=294100&browsesort=trend&days=7';
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -15,22 +48,14 @@ async function launch(chrome, options = {}) {
     delete launchOptions.sourceOverlay;
     const firefox = chrome === 'firefox';
     const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, firefox ? 'dist/firefox/manifest.json' : 'manifest.json'), 'utf8'));
-    const files = new Set(['manifest.json', ...Object.values(manifest.icons || {})]);
-    if (manifest.background && manifest.background.service_worker) files.add(manifest.background.service_worker);
-    for (const file of manifest.background && manifest.background.scripts || []) files.add(file);
-    if (manifest.options_ui) ['options.html', 'options.js', 'options.css', 'api-config.js', 'api-data.js'].forEach(file => files.add(file));
-    if (manifest.action && manifest.action.default_popup) ['popup.html', 'popup.js', 'popup.css'].forEach(file => files.add(file));
-    for (const script of manifest.content_scripts) {
-        for (const file of [...(script.js || []), ...(script.css || [])]) files.add(file);
-    }
+    const files = new Set(manifestFiles(manifest));
     const extension = fs.mkdtempSync(path.join(os.tmpdir(), 'wshs-test-'));
     for (const file of files) {
         fs.mkdirSync(path.dirname(path.join(extension, file)), { recursive: true });
-        const overlay = sourceOverlay && path.join(sourceOverlay, file);
-        fs.copyFileSync(overlay && fs.existsSync(overlay) ? overlay : path.join(ROOT, file), path.join(extension, file));
+        fs.copyFileSync(overlaySource(sourceOverlay, file) || path.join(ROOT, file), path.join(extension, file));
     }
     // Fixture suites must not depend on or consume the deployed shared service.
-    if (!useConfiguredService && files.has('api-config.js')) fs.writeFileSync(path.join(extension,'api-config.js'),"globalThis.WSHS_API_CONFIG = { serviceUrl: '' };\n");
+    if (!useConfiguredService && files.has(API_CONFIG)) fs.writeFileSync(path.join(extension, API_CONFIG), "globalThis.WSHS_API_CONFIG = { serviceUrl: '' };\n");
     // Firefox BiDi cannot open moz-extension popups. Seed only presentation
     // preferences in this disposable test copy; no production test bridge.
     if (presentationPreferences) {
@@ -206,4 +231,4 @@ async function moveFilterToGroup(page, selector, groupId, index = 0) {
     await wait(100);
 }
 
-module.exports = { launch, closeBrowser, extensionWorld, openBrowse, wait, BASE_URL, installFrameSampler, clickTitleWord, setWordMode, addSavedFilter, moveFilterToGroup, selectAddKind };
+module.exports = { launch, closeBrowser, sourcePath, overlaySource, extensionWorld, openBrowse, wait, BASE_URL, installFrameSampler, clickTitleWord, setWordMode, addSavedFilter, moveFilterToGroup, selectAddKind };

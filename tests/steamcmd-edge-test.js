@@ -90,7 +90,7 @@ const buttonCard=p=>p.evaluate(()=>{const b=document.querySelector('.wshs-steamc
 async function openCard(p,i){await p.hover(cardSel(i));await p.waitForFunction(i=>document.querySelector('.grid > .card:nth-child('+(i+1)+') .wshs-steamcmd-card'),{},i);await p.click('.wshs-steamcmd-card');await p.waitForSelector('.wshs-steamcmd-pop:not([hidden])');}
 async function settle(p,until){await p.waitForFunction(re=>!new RegExp(re).test(document.querySelector('.wshs-steamcmd-deps span')?.textContent||''),{timeout:8000},until||'Checking');}
 async function closePop(p){await p.mouse.click(5,990);await p.waitForFunction(()=>document.querySelector('.wshs-steamcmd-pop').hidden);}
-async function popupPage(b){const t=b.targets().find(t=>t.url().startsWith('chrome-extension://'));const pp=await b.newPage();await pp.goto('chrome-extension://'+new URL(t.url()).hostname+'/popup.html');await pp.waitForFunction(()=>!document.querySelector('#steamcmd-buttons').disabled);return pp;}
+async function popupPage(b){const t=b.targets().find(t=>t.url().startsWith('chrome-extension://'));const pp=await b.newPage();await pp.goto('chrome-extension://'+new URL(t.url()).hostname+'/src/popup/popup.html');await pp.waitForFunction(()=>!document.querySelector('#steamcmd-buttons').disabled);return pp;}
 
 (async()=>{
  const downloads=fs.mkdtempSync(path.join(os.tmpdir(),'wshs-steamcmd-edge-'));

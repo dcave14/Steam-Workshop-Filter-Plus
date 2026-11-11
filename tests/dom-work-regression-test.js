@@ -66,7 +66,7 @@ function check(name, value) { assert.ok(value, name); console.log('PASS '+name);
             await page.waitForSelector('.wshs-sidebar-search');
             await world(`(() => {
                 globalThis.sidebarCounts={discovery:0,style:0,decoration:0};
-                const discover=WSHSDom.getSortButton;WSHSDom.getSortButton=function(){if(new Error().stack.includes('workshop-sidebar.js'))sidebarCounts.discovery++;return discover()};
+                const discover=WSHSDom.getSortButton;WSHSDom.getSortButton=function(){if(new Error().stack.includes('src/workshop/workshop-sidebar.js'))sidebarCounts.discovery++;return discover()};
                 const set=CSSStyleDeclaration.prototype.setProperty;CSSStyleDeclaration.prototype.setProperty=function(name,value,...args){if(name.startsWith('--wshs-search-'))sidebarCounts.style++;return set.call(this,name,value,...args)};
                 const query=Element.prototype.querySelector;Element.prototype.querySelector=function(selector){if(selector==='.hide-subscribed-button, svg[viewBox="0 0 32 18"]')sidebarCounts.decoration++;return query.call(this,selector)};
             })()`);

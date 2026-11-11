@@ -2,8 +2,8 @@ const assert=require('assert/strict'),fs=require('fs'),vm=require('vm'),path=req
 let listener,calls=[],reply,stored={steamWebApiKey:'A'.repeat(32)},permitted=true,checks=0;
 function check(name,ok){assert.ok(ok,name);checks++;console.log('PASS '+name);}
 const context={URL,AbortSignal,Date,chrome:{runtime:{id:'test-extension',onMessage:{addListener(fn){listener=fn}},openOptionsPage:async()=>{}},permissions:{contains:async()=>permitted},storage:{local:{get:async()=>stored}}},fetch:async(url,options)=>{calls.push({url,options});return reply;}};
-vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../api-data.js'),'utf8'),context);
-vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../steam-api.js'),'utf8'),context);
+vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/background/api-data.js'),'utf8'),context);
+vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/background/steam-api.js'),'utf8'),context);
 const message=(request,sender={id:'test-extension'})=>new Promise(resolve=>{if(listener(request,sender,resolve)!==true)resolve(null)});
 const row=(id,extra={})=>({publishedfileid:id,result:1,title:'Fixture',...extra});
 const response=(rows,status=200)=>({status,ok:status===200,json:async()=>({response:{publishedfiledetails:rows}})});

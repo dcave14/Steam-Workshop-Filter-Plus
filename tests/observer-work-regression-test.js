@@ -1,7 +1,7 @@
 // Count real IIFE work in disposable sources; never add production test hooks.
 const assert=require('assert/strict'),fs=require('fs'),path=require('path'),os=require('os');
 const root=path.resolve(__dirname,'..');
-const {launch,closeBrowser,extensionWorld,wait}=require(path.join(root,'tests/browser-helpers'));
+const {launch,closeBrowser,extensionWorld,wait,sourcePath}=require(path.join(root,'tests/browser-helpers'));
 const {fixture}=require(path.join(root,'tests/filter-fixtures'));
 const overlay=fs.mkdtempSync(path.join(os.tmpdir(),'wshs-observer-work-'));
 let checks=0;function check(name,value){assert.ok(value,name);checks++;console.log('PASS '+name)}
@@ -11,7 +11,7 @@ for(const [file,functions] of Object.entries({
  'collection-sizes.js':{render:'sizeRender'},
  'filter-bar-pinning.js':{sync:'pinningSync'}
 })){
- let source=fs.readFileSync(path.join(root,file),'utf8');
+ let source=fs.readFileSync(sourcePath(file),'utf8');
  for(const [name,key]of Object.entries(functions)){
   const needle='function '+name+'() {';
   if(!source.includes(needle))throw Error('Missing '+file+':'+name);
@@ -100,7 +100,7 @@ function html(surface){let h=fixture(surface==='detail');if(surface!=='detail')h
  }
  await p.goto('about:blank');
  await p.setContent(fixture(false).replace('</style>','#CommunityTemplate{display:block}.fixture-grid{display:flex;flex-wrap:wrap;width:1000px;gap:20px}.fixture-card{box-sizing:border-box;width:235px;flex:none}</style>'));
- await p.addScriptTag({content:fs.readFileSync(path.join(root,'steam-dom.js'),'utf8')});
+ await p.addScriptTag({content:fs.readFileSync(sourcePath('steam-dom.js'),'utf8')});
  const fallback=await p.evaluate(()=>{
   const grid=document.querySelector('.fixture-grid'),sample=grid.firstElementChild.cloneNode(true),fragment=document.createDocumentFragment();
   for(let i=0;i<400;i++){const card=sample.cloneNode(true);card.querySelectorAll('a[href*="filedetails"]').forEach(a=>a.href='/sharedfiles/filedetails/?id='+(880000000+i));fragment.append(card)}grid.replaceChildren(fragment);
