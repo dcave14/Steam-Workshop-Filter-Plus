@@ -2,7 +2,7 @@
 
 How this project is tested.
 
-## Filter classes after a Steam redraw (unreleased)
+## 1.5.5 filter classes after a Steam redraw
 
 `tests/filter-class-repair-test.js` (fixture, 15 checks): with the star and
 minimum-ratings filters on, a whole `className` write on every card, on one
@@ -12,7 +12,7 @@ restores them. Class changes that keep the filter classes, and a synchronous
 remove-and-restore like the geometry pass, run no pass. A filter turned off
 while its class was already dropped leaves nothing remembered. Passes are
 counted in a disposable copy of `content.js`. With `WSHS_SOURCE_OVERLAY` set to
-a folder holding the 1.5.5 `content.js` and `steam-dom.js` the repair checks
+a folder holding the 1.5.4 `content.js` and `steam-dom.js` the repair checks
 fail.
 
 ## 1.5.5 layout classes after a Steam redraw

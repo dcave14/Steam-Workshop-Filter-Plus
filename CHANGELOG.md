@@ -1,10 +1,8 @@
 # Changelog
 
-## Unreleased
-- Fixed: a mod hidden by **Hide subscribed**, the star filter or the minimum-ratings filter could come back into view when Steam redrew its card. The card is hidden again within a frame
-
 ## 1.5.5 (2026-11-16)
 - Fixed: on **Browsing: Collections**, cards could stay squeezed (titles one word per line, stars top right, "Contains N items" wrapped) after Steam redrew them, most often after opening a collection and pressing Back, until the window was resized. Steam's redraw dropped the extension's layout classes from the cards; they are now put back within a frame. The same repair covers Compact cards, the grid itself, **Disable card hover animations**, pages restored by Back/Forward and tabs that were in the background
+- Fixed: a mod hidden by **Hide subscribed**, the star filter or the minimum-ratings filter could come back into view when Steam redrew its card. The card is hidden again within a frame
 
 ## 1.5.4 (2026-11-11)
 - **Mods per page** default in the settings popup (10, 15, 30, 50, 75 or 100). It applies to page one of Workshop browse pages whose link names no size; a size chosen on the page keeps priority for that tab, and later pages and shared links keep their own size
