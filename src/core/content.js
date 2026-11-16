@@ -987,10 +987,19 @@ function applyFilters() {
     applyRatingCountFilter();
 }
 
+// React can rewrite a card's className and drop a filter class without any
+// node changing; filter-class-repair.js notices and the filters run again.
+function setRatingsFiltered(node, on) {
+    if (window.WSHSFilterClasses) window.WSHSFilterClasses.set(node, 'wshs-ratings-filtered', on);
+    else node.classList.toggle('wshs-ratings-filtered', on);
+}
+if (window.WSHSFilterClasses) window.WSHSFilterClasses.onLost(() => scheduleDomWork(2));
+
 function applyRatingCountFilter() {
     if (!window.WSHSMetadata) return;
     if (!minimumRatings) {
-        document.querySelectorAll('.wshs-ratings-filtered').forEach(item => item.classList.remove('wshs-ratings-filtered'));
+        if (window.WSHSFilterClasses) window.WSHSFilterClasses.clear('wshs-ratings-filtered');
+        document.querySelectorAll('.wshs-ratings-filtered').forEach(item => setRatingsFiltered(item, false));
         const status = document.querySelector('.wshs-ratings-status');
         if (status) setText(status, 'Minimum number of user ratings.');
         const retry = document.querySelector('.wshs-ratings-retry'); if (retry) retry.hidden = true;
@@ -1006,7 +1015,7 @@ function applyRatingCountFilter() {
     for (const item of items) {
         const data = window.WSHSMetadata.get(item.id);
         const known = data && Number.isSafeInteger(data.ratings);
-        item.root.classList.toggle('wshs-ratings-filtered', !!(minimumRatings && known && data.ratings < minimumRatings));
+        setRatingsFiltered(item.root, !!(minimumRatings && known && data.ratings < minimumRatings));
         if (minimumRatings && !known) { unknown++; if (window.WSHSMetadata.pending(item.id)) loading = true; }
     }
     const status = document.querySelector('.wshs-ratings-status');

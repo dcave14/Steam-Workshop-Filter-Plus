@@ -6,7 +6,7 @@ let suites=[
  ['sidebar-alignment-test.js'],['sidebar-page-size-test.js'],['responsive-resize-test.js'],['toolbar-reset-test.js'],
  ['sort-popover-responsive-test.js'],['sort-popover-responsive-test.js','--firefox'],['sort-popover-responsive-test.js','--firefox','--comfortable'],
  ['apply-popover-responsive-test.js'],['apply-popover-responsive-test.js','--firefox'],['apply-popover-responsive-test.js','--firefox','--comfortable'],
- ['appearance-test.js'],['appearance-class-repair-test.js'],['preview-motion-test.js'],
+ ['appearance-test.js'],['appearance-class-repair-test.js'],['filter-class-repair-test.js'],['preview-motion-test.js'],
  ['browse-collections-test.js'],['browse-collections-test.js','--firefox'],
  ['browse-collections-test.js','--firefox','--comfortable'],
  ['collection-design-test.js'],['collection-details-test.js'],['collection-delayed-init-test.js'],['collection-overhaul-test.js'],['collection-overhaul-test.js','--firefox'],

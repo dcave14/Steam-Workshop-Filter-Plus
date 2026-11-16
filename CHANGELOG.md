@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- Fixed: a mod hidden by **Hide subscribed**, the star filter or the minimum-ratings filter could come back into view when Steam redrew its card. The card is hidden again within a frame
+
 ## 1.5.5 (2026-11-16)
 - Fixed: on **Browsing: Collections**, cards could stay squeezed (titles one word per line, stars top right, "Contains N items" wrapped) after Steam redrew them, most often after opening a collection and pressing Back, until the window was resized. Steam's redraw dropped the extension's layout classes from the cards; they are now put back within a frame. The same repair covers Compact cards, the grid itself, **Disable card hover animations**, pages restored by Back/Forward and tabs that were in the background
 

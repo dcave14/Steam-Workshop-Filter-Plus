@@ -759,6 +759,11 @@
     // Public API used by content.js
     // ---------------------------------------------------------------------
 
+    // filter-class-repair.js restores the class if React rewrites the card's className.
+    function setFilterClass(node, name, on) {
+        if (window.WSHSFilterClasses) window.WSHSFilterClasses.set(node, name, on);
+        else node.classList.toggle(name, on);
+    }
     function applyFilters(state) {
         var cards = enumerateCards();
         var hideSubscribed = !!(state && state.isHidingSubscribed);
@@ -780,7 +785,7 @@
                     unknownCount += 1;
                 }
             }
-            card.root.classList.toggle('hidden-item', hide);
+            setFilterClass(card.root, 'hidden-item', hide);
         }
         if (hideSubscribed) {
             requestStatuses(ids);
