@@ -120,7 +120,7 @@
                 if (node.closest('dialog,[role="dialog"]') || node.scrollWidth <= node.clientWidth + 1 || node.clientWidth < 100) return;
                 var style = getComputedStyle(node);
                 if (!['auto', 'scroll', 'hidden'].includes(style.overflowX) || node.querySelectorAll('a[href*="filedetails"]').length < 2) return;
-                desiredCarousels.add(node); stopCarousel(node); pauseAnimations(node, desiredAnimations, true);
+                desiredCarousels.add(node); stopCarousel(node); mark(node, 'wshs-paused-carousel'); pauseAnimations(node, desiredAnimations, true);
             });
         }
         carousels.forEach(function (state, node) { if (!desiredCarousels.has(node)) restoreCarousel(node, state); });
@@ -129,9 +129,46 @@
             if (target.isConnected && animation.playState === 'paused') animation.play();
             paused.delete(animation);
         });
+        watchClasses(cards);
         window.dispatchEvent(new Event('wshs-appearance-ready'));
     }
     function schedule() { if (frame === null) frame = requestAnimationFrame(sync); }
+    // React writes a redrawn node's className whole, which drops the classes
+    // marked above without adding or removing any node. Watch class changes
+    // only under the card containers (and paused carousels), and only while
+    // something is marked. Hover states change classes constantly, so each
+    // record costs a string search and Set lookups, never a DOM query.
+    var ownedClass = /wshs-(?:compact|collection-browse)-[a-z-]+|wshs-no-hover-motion|wshs-paused-carousel/g;
+    var classRoots = new Set();
+    var classObserver = new MutationObserver(function (records) {
+        if (frame !== null) return;
+        for (var i = 0; i < records.length; i++) {
+            var node = records[i].target, old = records[i].oldValue;
+            if (!old || old.indexOf('wshs-') === -1) continue;
+            if (!compactNodes.has(node) && !grids.has(node) && !motionCards.has(node) && !carousels.has(node)) continue;
+            ownedClass.lastIndex = 0;
+            for (var match = ownedClass.exec(old); match; match = ownedClass.exec(old)) {
+                if (!node.classList.contains(match[0])) { schedule(); return; }
+            }
+        }
+    });
+    function watchClasses(cards) {
+        var roots = new Set();
+        if (compactNodes.size || grids.size || motionCards.size || carousels.size) {
+            cards.forEach(function (card) { if (card.root.parentElement) roots.add(card.root.parentElement); });
+            carousels.forEach(function (state, node) { roots.add(node); });
+        }
+        var same = roots.size === classRoots.size;
+        if (same) roots.forEach(function (root) { if (!classRoots.has(root)) same = false; });
+        // Both branches discard the records of sync()'s own class writes, so a
+        // sync never schedules another one.
+        if (same) { classObserver.takeRecords(); return; }
+        classObserver.disconnect(); classRoots = roots;
+        roots.forEach(function (root) { classObserver.observe(root, { attributes: true, attributeFilter: ['class'], attributeOldValue: true, subtree: true }); });
+    }
+    // A frame requested while the page was hidden or in the back/forward cache
+    // may never have run; request a fresh one when the page is shown again.
+    function reschedule() { if (frame !== null) cancelAnimationFrame(frame); frame = null; schedule(); }
     var ignoredUi = '.wshs-picker,.wshs-folder-menu,.wshs-saved-filters,[popover],#workshop_item_hover,#global_hover,dialog,[role="dialog"],[aria-modal="true"]';
     var resultSelector = 'a[href*="sharedfiles/filedetails/?id="],.aspectratio_16x9,.aspectratio_square';
     function changesBrowseResults(change) {
@@ -162,6 +199,8 @@
         if (changes.some(function (m) { return !m.target.parentElement?.closest('.wshs-picker,.wshs-folder-menu,.wshs-saved-filters,#workshop_item_hover,#global_hover') && !m.target.closest?.('.wshs-picker,.wshs-folder-menu,.wshs-saved-filters,#workshop_item_hover,#global_hover'); })) schedule();
     }).observe(document, { childList: true, subtree: true });
     window.addEventListener('resize', schedule);
+    window.addEventListener('pageshow', function (event) { if (event.persisted) reschedule(); });
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') reschedule(); });
     document.addEventListener('animationstart', function () { if (preferences.reduceMotion === true) schedule(); }, true);
     document.addEventListener('pointerover', function () { if (home && preferences.reduceMotion === true && preferences.pauseHomepageCarousels !== false) schedule(); }, true);
     schedule();

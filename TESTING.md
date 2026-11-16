@@ -2,6 +2,20 @@
 
 How this project is tested.
 
+## 1.5.5 layout classes after a Steam redraw
+
+`tests/appearance-class-repair-test.js` (fixture, 38 checks, Comfortable and
+Compact): a whole `className` write on every marked card, on one card, on a
+title inside a card and on the grid removes the appearance classes, and each
+comes back after one `sync()` for the whole batch; a replaced grid node is
+marked and watched again. Class changes that keep our classes (hover states,
+other scripts' flags) cost no `sync()`, a density switch is exactly one, and
+`pageshow` with `persisted` and `visibilitychange` each run one. Extra `resize`
+events beside a wipe (RimOxide's workaround) still give one. `sync()` is
+counted in a disposable copy of the source. With
+`WSHS_SOURCE_OVERLAY` set to a folder holding the 1.5.4 file the repair checks
+fail.
+
 ## 1.5.4 default mods per page
 
 `tests/page-size-default-test.js` (live; Chrome 14 checks, `--firefox` 8): the
